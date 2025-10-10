@@ -4,17 +4,21 @@ import { Model } from 'mongoose';
 import { CreateBoardDto } from './dto/create-board.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
 import { Board, BoardDocument } from './entities/board.entity';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class BoardsService {
   constructor(
     @InjectModel(Board.name) private boardModel: Model<BoardDocument>,
+    private eventsGateway: EventsGateway,
   ) {}
 
   // Crear un nuevo tablero
   async create(createBoardDto: CreateBoardDto): Promise<Board> {
     const createdBoard = new this.boardModel(createBoardDto);
-    return createdBoard.save();
+    const saved = await createdBoard.save();
+    this.eventsGateway.emitBoardUpdated({ type: 'created', board: saved });
+    return saved;
   }
 
   // Obtener todos los tableros
@@ -42,7 +46,7 @@ export class BoardsService {
     if (!updatedBoard) {
       throw new NotFoundException(`Board con ID ${id} no encontrado`);
     }
-
+    this.eventsGateway.emitBoardUpdated({ type: 'updated', board: updatedBoard });
     return updatedBoard;
   }
 
@@ -53,7 +57,7 @@ export class BoardsService {
     if (!deletedBoard) {
       throw new NotFoundException(`Board con ID ${id} no encontrado`);
     }
-
+    this.eventsGateway.emitBoardUpdated({ type: 'deleted', boardId: id });
     return deletedBoard;
   }
 }

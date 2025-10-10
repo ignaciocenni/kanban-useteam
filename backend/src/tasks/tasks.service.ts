@@ -9,12 +9,14 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task, TaskDocument } from './entities/task.entity';
 import { BoardsService } from '../boards/boards.service';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class TasksService {
   constructor(
     @InjectModel(Task.name) private taskModel: Model<TaskDocument>,
     private boardsService: BoardsService,
+    private eventsGateway: EventsGateway,
   ) {}
 
   // Crear una nueva tarea
@@ -36,7 +38,10 @@ export class TasksService {
     }
 
     const createdTask = new this.taskModel(createTaskDto);
-    return createdTask.save();
+    const saved = await createdTask.save();
+    // Emitir evento en tiempo real
+    this.eventsGateway.emitTaskCreated(this.normalizeTask(saved));
+    return saved;
   }
 
   // Obtener todas las tareas (opcionalmente filtrar por boardId)
@@ -79,6 +84,8 @@ export class TasksService {
       throw new NotFoundException(`Task con ID ${id} no encontrada`);
     }
 
+    // Emitir evento en tiempo real
+    this.eventsGateway.emitTaskUpdated(this.normalizeTask(updatedTask));
     return updatedTask;
   }
 
@@ -90,6 +97,13 @@ export class TasksService {
       throw new NotFoundException(`Task con ID ${id} no encontrada`);
     }
 
+    // Emitir evento en tiempo real
+    this.eventsGateway.emitTaskDeleted({
+      id: this.ensureStringId(deletedTask.id ?? (deletedTask as any)._id),
+      boardId: this.ensureStringId(
+        (deletedTask as any).boardId ?? (deletedTask as any).board?.id,
+      ),
+    });
     return deletedTask;
   }
 
@@ -99,6 +113,72 @@ export class TasksService {
     newColumn: string,
     newPosition: number,
   ): Promise<Task> {
+    const taskToMove = await this.taskModel.findById(id).exec();
+    
+    if (!taskToMove) {
+      throw new NotFoundException(`Task con ID ${id} no encontrada`);
+    }
+
+    const oldColumn = taskToMove.column;
+    const oldPosition = taskToMove.position;
+
+    // Si la tarea se mueve dentro de la misma columna y a la misma posición, no hacer nada
+    if (oldColumn === newColumn && oldPosition === newPosition) {
+      return taskToMove;
+    }
+
+    // Obtener todas las tareas de la columna de destino (excluyendo la que se mueve)
+    const tasksInTargetColumn = await this.taskModel
+      .find({ 
+        boardId: taskToMove.boardId, 
+        column: newColumn,
+        _id: { $ne: id }
+      })
+      .sort({ position: 1 })
+      .exec();
+
+    // Validar que newPosition esté en rango
+    if (newPosition < 0) {
+      newPosition = 0;
+    }
+    if (newPosition > tasksInTargetColumn.length) {
+      newPosition = tasksInTargetColumn.length;
+    }
+
+    // Construir el nuevo orden: insertar la tarea movida en newPosition
+    const updates: Array<{ id: string; position: number }> = [];
+    
+    // Asignar nuevas posiciones a todas las tareas
+    for (let i = 0; i < tasksInTargetColumn.length; i++) {
+      const task = tasksInTargetColumn[i];
+      let finalPosition: number;
+      
+      if (i < newPosition) {
+        // Tareas antes de la posición de inserción mantienen su índice
+        finalPosition = i;
+      } else {
+        // Tareas después de la posición de inserción se desplazan +1
+        finalPosition = i + 1;
+      }
+      
+      if (task.position !== finalPosition) {
+        updates.push({ id: (task as any)._id.toString(), position: finalPosition });
+      }
+    }
+
+    // Actualizar todas las posiciones en batch
+    const bulkOps = updates.map(update => ({
+      updateOne: {
+        filter: { _id: update.id },
+        update: { $set: { position: update.position } }
+      }
+    }));
+
+    if (bulkOps.length > 0) {
+      await this.taskModel.bulkWrite(bulkOps);
+    }
+
+    // Actualizar la tarea movida
     const updatedTask = await this.taskModel
       .findByIdAndUpdate(
         id,
@@ -107,10 +187,68 @@ export class TasksService {
       )
       .exec();
 
-    if (!updatedTask) {
-      throw new NotFoundException(`Task con ID ${id} no encontrada`);
+    // Emitir eventos para todas las tareas actualizadas
+    for (const update of updates) {
+      const task = await this.taskModel.findById(update.id).exec();
+      if (task) {
+        this.eventsGateway.emitTaskUpdated(this.normalizeTask(task));
+      }
     }
 
-    return updatedTask;
+    // Emitir evento para la tarea movida
+    this.eventsGateway.emitTaskUpdated(this.normalizeTask(updatedTask!));
+    
+    return updatedTask!;
+  }
+
+  private ensureStringId(value: unknown): string {
+    if (!value) {
+      return '';
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    if (typeof (value as any).toString === 'function') {
+      return (value as any).toString();
+    }
+
+    return String(value);
+  }
+
+  private toIsoString(value: unknown): string {
+    if (!value) {
+      return new Date().toISOString();
+    }
+
+    const date = value instanceof Date ? value : new Date(value as string);
+
+    return Number.isNaN(date.getTime())
+      ? new Date().toISOString()
+      : date.toISOString();
+  }
+
+  private normalizeTask(task: Task | TaskDocument) {
+    const doc = task as any;
+    const plain =
+      typeof doc.toObject === 'function' ? doc.toObject() : { ...task };
+
+    const {
+      _id,
+      __v,
+      boardId: rawBoardId,
+      createdAt,
+      updatedAt,
+      ...rest
+    } = plain;
+
+    return {
+      ...rest,
+      id: this.ensureStringId(_id ?? plain.id),
+      boardId: this.ensureStringId(rawBoardId),
+      createdAt: this.toIsoString(createdAt),
+      updatedAt: this.toIsoString(updatedAt),
+    };
   }
 }

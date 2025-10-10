@@ -5,6 +5,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { BoardsModule } from './boards/boards.module';
 import { TasksModule } from './tasks/tasks.module';
+import { EventsModule } from './events/events.module';
+import { ExportsModule } from './exports/exports.module';
 
 @Module({
   imports: [
@@ -28,6 +30,10 @@ import { TasksModule } from './tasks/tasks.module';
     BoardsModule,
 
     TasksModule,
+
+    EventsModule,
+
+    ExportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
