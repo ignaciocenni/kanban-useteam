@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: kanban-mongodb
+    restart: unless-stopped
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: kanban-useteam
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - kanban-network
+
+  # N8N Automation (lo usaremos en Día 3)
+  n8n:
+    image: n8nio/n8n:1.106.3
+    container_name: kanban-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - kanban-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  n8n_data:
+    driver: local
+
+networks:
+  kanban-network:
+    driver: bridge
