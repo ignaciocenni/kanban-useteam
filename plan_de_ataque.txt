@@ -1,0 +1,48 @@
+Plan de Ataque
+Una vez que confirmes los prerrequisitos, este será nuestro roadmap. Lo he dividido en fases y pasos lógicos para que podamos construir la aplicación de forma incremental y ordenada.
+
+FASE 1: Backend - El Núcleo Funcional (NestJS + MongoDB)
+
+Hito: API RESTful funcional y conexión WebSocket establecida.
+
+1.1: Setup inicial del proyecto NestJS: estructura de carpetas, módulos y configuración inicial.
+
+1.2: Conexión a MongoDB con Mongoose: Definición de esquemas y modelos para Columnas y Tareas.
+
+1.3: Endpoints CRUD para Tarjetas y Columnas: Crear, leer, actualizar y eliminar los elementos del tablero vía API REST.
+
+1.4: Setup de WebSockets con Socket.io: Crear el Gateway de NestJS para manejar conexiones en tiempo real.
+
+1.5: Lógica de Sincronización en Tiempo Real: Emitir eventos a todos los clientes conectados cuando una tarea se crea, actualiza (ej. cambia de columna) o elimina.
+
+1.6: Creación del Endpoint para el Webhook de N8N: Un endpoint simple que recibirá la petición del frontend y cuya única responsabilidad será disparar el workflow de N8N.
+
+FASE 2: Frontend - La Interfaz Interactiva (React)
+
+Hito: Tablero Kanban funcional con drag & drop y sincronización visual en tiempo real.
+
+2.1: Setup inicial del proyecto React con Vite: Estructura de carpetas y configuración.
+
+2.2: Creación de Componentes UI: Board, Column, Card. Maquetación estática inicial.
+
+2.3: Conexión con la API Backend: Obtener y renderizar las columnas y tarjetas desde nuestra API NestJS.
+
+2.4: Implementación de Drag & Drop: Usaremos una librería robusta como dnd-kit para manejar el movimiento de tarjetas entre columnas.
+
+2.5: Integración con WebSockets: Conectar el cliente de React al servidor de Socket.io para recibir y reflejar los cambios de otros usuarios en tiempo real.
+
+2.6: Lógica del Botón de Exportación: Implementar el botón en la UI que llame al endpoint de exportación en el backend.
+
+FASE 3: Integración y Despliegue (N8N + Docker)
+
+Hito: Flujo de exportación completo y proyecto listo para entregar.
+
+3.1: Configuración del Workflow en N8N: Diseñar el flujo que se activa por webhook, consulta la base de datos, genera un CSV y lo envía por email.
+
+3.2: Creación y configuración del docker-compose.yml: Para levantar MongoDB y N8N con un solo comando.
+
+3.3: Variables de Entorno y Documentación: Llenar el .env.example y escribir un README.md claro con las instrucciones de instalación y ejecución.
+
+3.4: Pruebas End-to-End: Probar el flujo completo: mover una tarjeta, verla reflejada en otra pestaña del navegador y luego exportar el tablero por email.
+
+3.5: Preparación para la Entrega Final: Limpieza de código y pasos finales para compartir el repositorio.
