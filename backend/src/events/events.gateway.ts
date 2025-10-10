@@ -1,6 +1,10 @@
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 
+/**
+ * Gateway WebSocket para eventos en tiempo real
+ * Emite eventos a todos los clientes conectados cuando hay cambios en tareas o tableros
+ */
 @WebSocketGateway({
   cors: {
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',

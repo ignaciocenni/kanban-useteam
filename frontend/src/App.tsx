@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Board as BoardType, Task, Column } from './types'
+import { Board as BoardType, Task } from './types'
 import { Board } from './components/Board'
 import { mockBoard, mockTasks } from './data/mockData'
 import './App.css'
@@ -19,45 +19,32 @@ function App() {
   const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [exportMessage, setExportMessage] = useState<string>('')
 
+  // Cargar datos iniciales del backend al montar el componente
   useEffect(() => {
     let cancelled = false
     async function load() {
       try {
-        console.log('Loading data from backend...')
         const apiBoards = await getBoards()
-        console.log('Boards loaded:', apiBoards.length)
 
         if (!cancelled && apiBoards.length > 0) {
-          const normalizedBoards = apiBoards.map((b: any) => {
-            console.log('📋 Raw board from API:', b.id, 'title:', b.title)
-            console.log('📋 Raw columns:', JSON.stringify(b.columns, null, 2))
-            const normalized = normalizeColumns(b.columns)
-            console.log('📋 Normalized columns:', normalized.map((c: Column) => c.title))
-            return {
-              id: b.id || b._id,
-              title: b.title || 'Sin título',
-              description: b.description || '',
-              columns: normalized,
-              createdAt: new Date(b.createdAt),
-              updatedAt: new Date(b.updatedAt),
-            }
-          }) as BoardType[]
-          console.log('📋 Normalized boards:', normalizedBoards.map(b => ({ 
-            id: b.id, 
-            title: b.title, 
-            columns: b.columns.map((c: Column) => c.title) 
-          })))
+          // Normalizar columnas de cada tablero
+          const normalizedBoards = apiBoards.map((b: any) => ({
+            id: b.id || b._id,
+            title: b.title || 'Sin título',
+            description: b.description || '',
+            columns: normalizeColumns(b.columns),
+            createdAt: new Date(b.createdAt),
+            updatedAt: new Date(b.updatedAt),
+          })) as BoardType[]
 
           const first = normalizedBoards[0]
-          console.log('Loading tasks for board:', first.id)
-
           const apiTasks = await getTasks(first.id)
-          console.log('Tasks loaded:', apiTasks.length)
 
           if (!cancelled) {
             setActiveBoardId(first.id)
             setBoards(normalizedBoards)
 
+            // Normalizar tareas para compatibilidad con MongoDB
             const normalizedTasks = apiTasks.map(t => ({
               ...t,
               id: (t as any).id || (t as any)._id,
@@ -69,17 +56,10 @@ function App() {
             })) as Task[]
 
             setTasks(normalizedTasks)
-            console.log('Data loaded successfully:', {
-              boards: normalizedBoards.length,
-              tasks: normalizedTasks.length
-            })
           }
-        } else {
-          console.log('No boards from API, keeping mock data')
         }
       } catch (e) {
         console.warn('Backend not available, using mock data:', e)
-        // Ya tenemos los mocks por defecto
       }
     }
     load()
@@ -90,11 +70,11 @@ function App() {
 
   const handleCreateTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const newTask = await createTask(task)
-      console.log('✅ Task created via API:', newTask.id)
+      await createTask(task)
+      // WebSocket actualizará el estado automáticamente
     } catch (error) {
-      console.error('❌ Error creating task:', error)
-      // Fallback: agregar localmente solo si falla el API
+      console.error('Error creating task:', error)
+      // Fallback: agregar localmente si falla el API
       const mockTask: Task = {
         ...task,
         id: Date.now().toString(),
@@ -189,8 +169,8 @@ function App() {
   useEffect(() => {
     const socket = getSocket()
 
+    // Sincronización en tiempo real: nueva tarea creada por otro usuario
     const handleTaskCreated = (task: TaskCreatedEvent) => {
-      console.log('📥 Task created via WebSocket:', task.id, 'boardId:', task.boardId)
       setTasks(prev => {
         const normalized = {
           ...task,
@@ -199,40 +179,32 @@ function App() {
           updatedAt: new Date(task.updatedAt),
         }
 
-        // Verificar si la tarea ya existe
+        // Evitar duplicados si la tarea ya existe
         const exists = prev.some(t => t.id === normalized.id)
-        if (exists) {
-          console.log('⚠️ Task already exists, skipping:', normalized.id)
-          return prev
-        }
+        if (exists) return prev
 
-        console.log('✅ Adding new task:', normalized.id, 'to column:', normalized.column)
         return [...prev, normalized]
       })
     }
 
+    // Sincronización en tiempo real: tarea actualizada
     const handleTaskUpdated = (task: TaskUpdatedEvent) => {
-      console.log('Task updated via WebSocket:', task.id)
       setTasks(prev =>
         prev.map(t =>
           t.id === task.id
-            ? {
-                ...t,
-                ...task,
-                updatedAt: new Date(task.updatedAt),
-              }
+            ? { ...t, ...task, updatedAt: new Date(task.updatedAt) }
             : t,
         ),
       )
     }
 
+    // Sincronización en tiempo real: tarea eliminada
     const handleTaskDeleted = (task: TaskDeletedEvent) => {
-      console.log('Task deleted via WebSocket:', task.id)
       setTasks(prev => prev.filter(taskItem => taskItem.id !== task.id))
     }
 
+    // Sincronización en tiempo real: tablero actualizado/creado/eliminado
     const handleBoardUpdated = (payload: BoardUpdatedEvent) => {
-      console.log('📥 Board updated via WebSocket:', payload.type)
       if (payload.type === 'deleted' && payload.boardId) {
         setBoards(prev => prev.filter(b => b.id !== payload.boardId))
         setTasks(prev => prev.filter(task => task.boardId !== payload.boardId))
@@ -241,8 +213,6 @@ function App() {
       if (payload.type === 'updated' || payload.type === 'created') {
         const board = payload.board
         if (!board) return
-
-        console.log('📋 Board from WebSocket:', board.id, 'columns:', (board as any).columns)
 
         setBoards(prev => {
           const normalized = {
@@ -253,8 +223,6 @@ function App() {
             updatedAt: new Date(board.updatedAt ?? Date.now()),
           }
 
-          console.log('📋 Normalized board columns:', normalized.columns.map((c: Column) => c.title))
-
           const existing = prev.find(b => b.id === normalized.id)
           if (existing) {
             return prev.map(b => (b.id === normalized.id ? normalized : b))
@@ -262,6 +230,7 @@ function App() {
           return [...prev, normalized]
         })
 
+        // Si es un tablero nuevo, cargarlo y activarlo
         if (payload.type === 'created') {
           setActiveBoardId(board.id || board._id)
           getTasks(board.id || board._id).then(apiTasks => {
@@ -287,9 +256,7 @@ function App() {
     socket.on('board.updated', handleBoardUpdated)
 
     return () => {
-      // Solo desconectar si el componente realmente se desmonta
-      // No desconectar en re-renders
-      console.log('🔄 WebSocket useEffect cleanup')
+      // Cleanup: los listeners se mantienen activos durante toda la sesión
     }
   }, [])
 

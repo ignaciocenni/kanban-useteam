@@ -2,12 +2,23 @@ import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import { ExportBacklogDto } from './dto/export-backlog.dto';
 
+/**
+ * Servicio de exportación de backlog
+ * Dispara el workflow de N8N para generar CSV y enviar por email
+ */
 @Injectable()
 export class ExportsService {
   private readonly logger = new Logger(ExportsService.name);
 
   constructor(private readonly configService: ConfigService) {}
 
+  /**
+   * Dispara el webhook de N8N para exportar el backlog de un tablero
+   * N8N se encarga de:
+   * 1. Consultar las tareas del tablero
+   * 2. Generar archivo CSV
+   * 3. Enviar por email al destinatario
+   */
   async exportBacklog(payload: ExportBacklogDto) {
     const webhookUrl = this.configService.get<string>('N8N_WEBHOOK_URL');
 

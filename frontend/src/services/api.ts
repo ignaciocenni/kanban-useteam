@@ -3,6 +3,10 @@ import { normalizeColumns } from '../utils/columns'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
+/**
+ * Normaliza un tablero desde el formato de MongoDB al formato del frontend
+ * Convierte _id a id y normaliza columnas
+ */
 function normalizeBoard(board: any): Board {
   return {
     id: board.id || board._id,
@@ -14,6 +18,10 @@ function normalizeBoard(board: any): Board {
   }
 }
 
+/**
+ * Normaliza una tarea desde el formato de MongoDB al formato del frontend
+ * Convierte _id a id y garantiza tipos consistentes
+ */
 function normalizeTask(task: any): Task {
   return {
     id: task.id || task._id,
@@ -71,6 +79,10 @@ export async function deleteTask(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete task')
 }
 
+/**
+ * Actualiza la posición de una tarea (drag & drop)
+ * El backend recalcula las posiciones de todas las tareas afectadas
+ */
 export async function updateTaskPosition(id: string, column: string, position: number): Promise<Task> {
   const res = await fetch(`${API_URL}/tasks/${id}/position`, {
     method: 'PATCH',
@@ -88,6 +100,10 @@ export interface ExportBacklogPayload {
   fields?: string[]
 }
 
+/**
+ * Dispara la exportación del backlog vía N8N
+ * El backend llama al webhook de N8N que genera CSV y envía por email
+ */
 export async function exportBacklog(payload: ExportBacklogPayload): Promise<any> {
   const res = await fetch(`${API_URL}/exports/backlog`, {
     method: 'POST',
@@ -100,7 +116,6 @@ export async function exportBacklog(payload: ExportBacklogPayload): Promise<any>
     throw new Error(`Failed to trigger export: ${res.status} ${errorText}`)
   }
 
-  // El backend puede devolver éxito sin body JSON, tratamos de parsear de todas formas
   try {
     return await res.json()
   } catch (error) {

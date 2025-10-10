@@ -107,7 +107,16 @@ export class TasksService {
     return deletedTask;
   }
 
-  // Actualizar posición de una tarea (para drag & drop)
+  /**
+   * Actualizar posición de una tarea (drag & drop)
+   * 
+   * Algoritmo:
+   * 1. Obtiene todas las tareas de la columna destino (excluyendo la que se mueve)
+   * 2. Inserta la tarea en la nueva posición
+   * 3. Recalcula las posiciones de todas las tareas afectadas
+   * 4. Actualiza en batch para optimizar operaciones de BD
+   * 5. Emite eventos WebSocket para sincronización en tiempo real
+   */
   async updatePosition(
     id: string,
     newColumn: string,
@@ -122,7 +131,6 @@ export class TasksService {
     const oldColumn = taskToMove.column;
     const oldPosition = taskToMove.position;
 
-    // Si la tarea se mueve dentro de la misma columna y a la misma posición, no hacer nada
     if (oldColumn === newColumn && oldPosition === newPosition) {
       return taskToMove;
     }
@@ -145,28 +153,19 @@ export class TasksService {
       newPosition = tasksInTargetColumn.length;
     }
 
-    // Construir el nuevo orden: insertar la tarea movida en newPosition
     const updates: Array<{ id: string; position: number }> = [];
     
-    // Asignar nuevas posiciones a todas las tareas
+    // Recalcular posiciones: las tareas después de newPosition se desplazan +1
     for (let i = 0; i < tasksInTargetColumn.length; i++) {
       const task = tasksInTargetColumn[i];
-      let finalPosition: number;
-      
-      if (i < newPosition) {
-        // Tareas antes de la posición de inserción mantienen su índice
-        finalPosition = i;
-      } else {
-        // Tareas después de la posición de inserción se desplazan +1
-        finalPosition = i + 1;
-      }
+      const finalPosition = i < newPosition ? i : i + 1;
       
       if (task.position !== finalPosition) {
         updates.push({ id: (task as any)._id.toString(), position: finalPosition });
       }
     }
 
-    // Actualizar todas las posiciones en batch
+    // Actualizar todas las posiciones en batch para optimizar
     const bulkOps = updates.map(update => ({
       updateOne: {
         filter: { _id: update.id },
@@ -187,7 +186,7 @@ export class TasksService {
       )
       .exec();
 
-    // Emitir eventos para todas las tareas actualizadas
+    // Emitir eventos WebSocket para sincronización en tiempo real
     for (const update of updates) {
       const task = await this.taskModel.findById(update.id).exec();
       if (task) {
@@ -195,40 +194,38 @@ export class TasksService {
       }
     }
 
-    // Emitir evento para la tarea movida
     this.eventsGateway.emitTaskUpdated(this.normalizeTask(updatedTask!));
     
     return updatedTask!;
   }
 
+  /**
+   * Normaliza un valor a string para garantizar compatibilidad con frontend
+   */
   private ensureStringId(value: unknown): string {
-    if (!value) {
-      return '';
-    }
-
-    if (typeof value === 'string') {
-      return value;
-    }
-
+    if (!value) return '';
+    if (typeof value === 'string') return value;
     if (typeof (value as any).toString === 'function') {
       return (value as any).toString();
     }
-
     return String(value);
   }
 
+  /**
+   * Convierte fechas a formato ISO string
+   */
   private toIsoString(value: unknown): string {
-    if (!value) {
-      return new Date().toISOString();
-    }
-
+    if (!value) return new Date().toISOString();
     const date = value instanceof Date ? value : new Date(value as string);
-
     return Number.isNaN(date.getTime())
       ? new Date().toISOString()
       : date.toISOString();
   }
 
+  /**
+   * Normaliza documento de Mongoose a formato esperado por frontend
+   * Convierte _id a id, elimina campos internos de Mongo (__v)
+   */
   private normalizeTask(task: Task | TaskDocument) {
     const doc = task as any;
     const plain =

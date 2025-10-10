@@ -33,6 +33,13 @@ export const Board: React.FC<BoardProps> = ({
     e.dataTransfer.dropEffect = 'move'
   }
 
+  /**
+   * Maneja el drop de una tarea en una columna
+   * Calcula la nueva posición considerando:
+   * - Si se suelta al final de la columna (sin target específico)
+   * - Si se suelta sobre otra tarea (reordenamiento)
+   * - Si se arrastra hacia arriba o hacia abajo en la misma columna
+   */
   const handleDrop = async (targetColumn: string) => {
     if (!draggedTask) return
 
@@ -40,25 +47,15 @@ export const Board: React.FC<BoardProps> = ({
       .filter(t => t.column === targetColumn)
       .sort((a, b) => a.position - b.position)
 
-    console.log('🎯 Drop:', {
-      draggedTask: draggedTask.title,
-      draggedColumn: draggedTask.column,
-      targetColumn,
-      dragOverTask,
-      currentOrder: currentTasksInColumn.map(t => t.title)
-    })
-
+    // Caso 1: Drop al final de la columna (sin target específico)
     if (!dragOverTask) {
       if (draggedTask.column === targetColumn) {
-        console.log('⚠️ Same column, no target - no action')
         setDraggedTask(null)
         setDragOverTask(null)
         return
       }
 
       const newPosition = currentTasksInColumn.length
-      console.log('🎯 Moving to end of column, position:', newPosition)
-
       try {
         await onUpdateTaskPosition?.(draggedTask.id, targetColumn, newPosition)
       } catch (error) {
@@ -70,16 +67,12 @@ export const Board: React.FC<BoardProps> = ({
       return
     }
 
+    // Caso 2: Drop sobre otra tarea (reordenamiento)
     const targetTask = currentTasksInColumn.find(t => t.id === dragOverTask)
 
     if (!targetTask) {
-      console.log('⚠️ Target task not found in target column')
-      console.log('⚠️ dragOverTask ID:', dragOverTask)
-      console.log('⚠️ Available tasks:', currentTasksInColumn.map(t => ({ id: t.id, title: t.title })))
-
+      // Fallback: mover al final si no se encuentra la tarea target
       const newPosition = currentTasksInColumn.length
-      console.log('🎯 Fallback move to end, position:', newPosition)
-
       try {
         await onUpdateTaskPosition?.(draggedTask.id, targetColumn, newPosition)
       } catch (error) {
@@ -91,6 +84,7 @@ export const Board: React.FC<BoardProps> = ({
       return
     }
 
+    // Calcular nueva posición considerando dirección del drag
     const tasksWithoutDragged = currentTasksInColumn.filter(t => t.id !== draggedTask.id)
     const targetIndexInFilteredArray = tasksWithoutDragged.findIndex(t => t.id === dragOverTask)
     const draggedIndex = currentTasksInColumn.findIndex(t => t.id === draggedTask.id)
@@ -101,18 +95,10 @@ export const Board: React.FC<BoardProps> = ({
       targetIndex !== -1 &&
       draggedIndex < targetIndex
 
-    console.log('🎯 Target task:', targetTask.title)
-    console.log('🎯 Tasks without dragged:', tasksWithoutDragged.map(t => t.title))
-    console.log('🎯 Target index in filtered array:', targetIndexInFilteredArray)
-    console.log('🎯 Dragged index:', draggedIndex, 'Target index:', targetIndex)
-    console.log('🎯 Dragging down?', isDraggingDown)
-
     let newPosition = targetIndexInFilteredArray
     if (isDraggingDown) {
       newPosition = targetIndexInFilteredArray + 1
     }
-
-    console.log('🎯 Final new position:', newPosition)
 
     try {
       await onUpdateTaskPosition?.(draggedTask.id, targetColumn, newPosition)

@@ -41,10 +41,13 @@ interface SocketEvents {
 
 let socket: Socket<SocketEvents> | null = null
 
+/**
+ * Obtiene la instancia singleton del socket WebSocket
+ * Conecta automáticamente al backend para recibir eventos en tiempo real
+ */
 export function getSocket(): Socket<SocketEvents> {
   if (!socket) {
     const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3000'
-    console.log('🔌 Connecting to WebSocket:', wsUrl)
 
     socket = io(wsUrl, {
       transports: ['websocket'],
