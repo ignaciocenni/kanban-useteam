@@ -291,33 +291,50 @@ function App() {
         <button
           onClick={handleOpenExportModal}
           style={{
-            marginTop: '12px',
-            padding: '10px 18px',
-            background: '#6a11cb',
+            marginTop: '6px',
+            padding: '8px 18px',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: '8px',
             cursor: 'pointer',
-            fontWeight: 'bold',
-            boxShadow: '0 4px 12px rgba(106, 17, 203, 0.35)'
+            fontWeight: '600',
+            fontSize: '0.8rem',
+            boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+            transition: 'all 0.3s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)'
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)'
           }}
         >
-          Exportar backlog
+          📤 Exportar backlog
         </button>
         {boards.length > 1 && (
-          <div style={{ marginTop: '10px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+          <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
             {boards.map((board, index) => (
               <button
                 key={board.id}
                 onClick={() => handleSwitchBoard(index)}
                 style={{
-                  padding: '8px 16px',
-                  background: index === activeBoardIndex ? '#4CAF50' : '#ddd',
-                  color: index === activeBoardIndex ? 'white' : 'black',
-                  border: 'none',
-                  borderRadius: '4px',
+                  padding: '6px 14px',
+                  background: index === activeBoardIndex 
+                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                    : 'rgba(255, 255, 255, 0.8)',
+                  color: index === activeBoardIndex ? 'white' : '#4a5568',
+                  border: index === activeBoardIndex ? 'none' : '2px solid rgba(102, 126, 234, 0.2)',
+                  borderRadius: '8px',
                   cursor: 'pointer',
-                  fontWeight: index === activeBoardIndex ? 'bold' : 'normal'
+                  fontWeight: index === activeBoardIndex ? '600' : '500',
+                  fontSize: '0.8rem',
+                  transition: 'all 0.3s ease',
+                  boxShadow: index === activeBoardIndex 
+                    ? '0 2px 8px rgba(102, 126, 234, 0.3)' 
+                    : 'none'
                 }}
               >
                 {board.title}
@@ -352,7 +369,8 @@ function App() {
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -363,23 +381,23 @@ function App() {
             onSubmit={handleExportSubmit}
             style={{
               background: 'white',
-              padding: '24px',
-              borderRadius: '12px',
-              width: '420px',
+              padding: '28px',
+              borderRadius: '16px',
+              width: '440px',
               maxWidth: '90vw',
-              boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px'
+              gap: '18px'
             }}
           >
-            <h2 style={{ margin: 0, color: '#4e54c8' }}>Exportar backlog</h2>
-            <p style={{ margin: 0, color: '#555' }}>
+            <h2 style={{ margin: 0, color: '#2d3748', fontWeight: '700', fontSize: '1.5rem' }}>Exportar backlog</h2>
+            <p style={{ margin: 0, color: '#718096', fontSize: '0.95rem' }}>
               Ingresa el email que recibirá el CSV generado por N8N.
             </p>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontWeight: 600 }}>Email destino</span>
+              <span style={{ fontWeight: 600, color: '#374151' }}>Email destino</span>
               <input
                 type="email"
                 value={exportEmail}
@@ -387,24 +405,40 @@ function App() {
                 required
                 placeholder="usuario@dominio.com"
                 style={{
-                  padding: '10px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #ccc'
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: '2px solid #e2e8f0',
+                  background: '#f7fafc',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.2s ease',
+                  color: '#2d3748'
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#667eea'
+                  e.currentTarget.style.background = 'white'
+                  e.currentTarget.style.boxShadow = '0 0 0 4px rgba(102, 126, 234, 0.1)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e2e8f0'
+                  e.currentTarget.style.background = '#f7fafc'
+                  e.currentTarget.style.boxShadow = 'none'
                 }}
               />
             </label>
 
             <fieldset
               style={{
-                border: '1px solid #eee',
-                borderRadius: '8px',
-                padding: '12px',
+                border: '2px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '16px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: '8px'
+                gap: '10px',
+                background: '#f7fafc',
+                color: '#2d3748'
               }}
             >
-              <legend style={{ padding: '0 8px', color: '#6a11cb', fontWeight: 600 }}>Campos a exportar (opcional)</legend>
+              <legend style={{ padding: '0 10px', color: '#667eea', fontWeight: 700, fontSize: '0.875rem' }}>Campos a exportar (opcional)</legend>
               {[
                 { key: 'title', label: 'Título' },
                 { key: 'description', label: 'Descripción' },
@@ -421,26 +455,28 @@ function App() {
                   {field.label}
                 </label>
               ))}
-              <small style={{ color: '#777' }}>Si no seleccionas ninguno, se enviarán todos los campos por defecto.</small>
+              <small style={{ color: '#a0aec0', fontSize: '0.8rem' }}>Si no seleccionas ninguno, se enviarán todos los campos por defecto.</small>
             </fieldset>
 
             {exportStatus !== 'idle' && (
               <div
                 style={{
-                  padding: '10px',
-                  borderRadius: '6px',
+                  padding: '12px',
+                  borderRadius: '8px',
                   backgroundColor:
                     exportStatus === 'loading'
-                      ? '#e3f2fd'
+                      ? 'rgba(102, 126, 234, 0.1)'
                       : exportStatus === 'success'
-                        ? '#e8f5e9'
-                        : '#ffebee',
+                        ? 'rgba(72, 187, 120, 0.1)'
+                        : 'rgba(239, 68, 68, 0.1)',
                   color:
                     exportStatus === 'loading'
-                      ? '#1565c0'
+                      ? '#667eea'
                       : exportStatus === 'success'
-                        ? '#1b5e20'
-                        : '#c62828'
+                        ? '#38a169'
+                        : '#ef4444',
+                  fontWeight: '500',
+                  fontSize: '0.9rem'
                 }}
               >
                 {exportMessage}
@@ -452,28 +488,45 @@ function App() {
                 type="button"
                 onClick={handleCloseExportModal}
                 style={{
-                  padding: '10px 16px',
-                  borderRadius: '6px',
-                  border: '1px solid #ccc',
-                  background: 'white',
-                  cursor: 'pointer'
+                  padding: '12px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#e2e8f0',
+                  color: '#4a5568',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  transition: 'all 0.2s ease'
                 }}
                 disabled={exportStatus === 'loading'}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#cbd5e0'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#e2e8f0'}
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 style={{
-                  padding: '10px 20px',
-                  borderRadius: '6px',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
                   border: 'none',
-                  background: '#6a11cb',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: 'white',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
+                  fontWeight: '600',
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                  transition: 'all 0.3s ease'
                 }}
                 disabled={exportStatus === 'loading'}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)'
+                }}
               >
                 {exportStatus === 'loading' ? 'Enviando...' : 'Enviar exportación'}
               </button>

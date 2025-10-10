@@ -1,121 +1,163 @@
-/* Estilos para el tablero Kanban */
+/* Estilos modernos para el tablero Kanban */
 
 /* Board */
 .kanban-board {
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 1400px;
 }
 
 .board-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   padding-bottom: 1rem;
-  border-bottom: 2px solid #e9ecef;
+  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
 }
 
 .board-title {
-  font-size: 2rem;
-  color: #2c3e50;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  color: #2d3748;
+  margin-bottom: 0.25rem;
+  font-weight: 700;
 }
 
 .board-description {
-  color: #6c757d;
-  font-size: 1.1rem;
+  color: #718096;
+  font-size: 0.875rem;
   margin: 0;
+  font-weight: 500;
 }
 
 .board-columns {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
   overflow-x: auto;
-  padding: 1rem 0;
-  min-height: 500px;
+  padding: 0.5rem 0;
+  align-items: stretch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(102, 126, 234, 0.3) transparent;
+}
+
+.board-columns::-webkit-scrollbar {
+  height: 8px;
+}
+
+.board-columns::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.board-columns::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.3);
+  border-radius: 4px;
+}
+
+.board-columns::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.5);
 }
 
 /* Column */
 .kanban-column {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  width: 300px;
-  min-height: 400px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  border: 1px solid rgba(102, 126, 234, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  width: 340px;
+  min-width: 340px;
+  flex: 0 0 340px;
   display: flex;
   flex-direction: column;
+  transition: all 0.3s ease;
+  height: fit-content;
+  min-height: 200px;
+}
+
+.kanban-column:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
 }
 
 .column-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid #e9ecef;
+  padding: 1rem 1.25rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  border-radius: 8px 8px 0 0;
+  border-radius: 12px 12px 0 0;
 }
 
 .column-title {
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 700;
   margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .task-count {
-  background: rgba(255,255,255,0.2);
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 500;
+  background: rgba(255, 255, 255, 0.25);
+  padding: 0.25rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: center;
 }
 
 .column-content {
-  flex: 1;
   padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
+  flex: 1;
 }
 
 .empty-column {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #adb5bd;
+  color: #a0aec0;
   font-style: italic;
-  border: 2px dashed #dee2e6;
-  border-radius: 4px;
-  margin: 1rem;
-  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  border: 2px dashed rgba(102, 126, 234, 0.2);
+  border-radius: 8px;
+  margin: 0.5rem;
+  transition: all 0.3s ease;
+  padding: 3rem 1rem;
+  min-height: 120px;
 }
 
 .empty-column:hover {
-  border-color: #667eea;
+  border-color: rgba(102, 126, 234, 0.4);
   color: #667eea;
+  background: rgba(102, 126, 234, 0.02);
 }
 
 /* Card */
 .kanban-card {
   background: white;
   padding: 1rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  border: 1px solid #e9ecef;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(102, 126, 234, 0.08);
   cursor: move;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
 
 .kanban-card:hover {
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.15);
+  transform: translateY(-3px);
+  border-color: rgba(102, 126, 234, 0.2);
 }
 
 .kanban-card.dragging {
-  opacity: 0.5;
-  transform: rotate(5deg);
+  opacity: 0.6;
+  transform: rotate(3deg) scale(1.02);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
 }
 
 .card-header {
@@ -126,11 +168,11 @@
 }
 
 .card-title {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: #2c3e50;
+  color: #2d3748;
   margin: 0;
-  line-height: 1.3;
+  line-height: 1.4;
   flex: 1;
 }
 
@@ -144,18 +186,25 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  font-size: 1rem;
-  transition: background-color 0.2s ease;
+  padding: 0.35rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  opacity: 0.6;
+}
+
+.card-action-btn:hover {
+  opacity: 1;
 }
 
 .edit-btn:hover {
-  background-color: #e3f2fd;
+  background-color: rgba(102, 126, 234, 0.1);
+  color: #667eea;
 }
 
 .delete-btn:hover {
-  background-color: #ffebee;
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
 }
 
 .card-description {
@@ -163,26 +212,34 @@
 }
 
 .card-date {
-  font-size: 0.8rem;
-  color: #adb5bd;
+  font-size: 0.75rem;
+  color: #a0aec0;
+  font-weight: 500;
 }
 
 /* Add Task Button */
 .add-task-button {
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   border: none;
   padding: 0.75rem;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
   margin-top: auto;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  flex-shrink: 0;
 }
 
 .add-task-button:hover {
-  background: #5a67d8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.add-task-button:active {
+  transform: translateY(0);
 }
 
 /* Modal */
@@ -192,25 +249,47 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  animation: fadeIn 0.2s ease;
+  padding: 1rem;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal-content {
   background: white;
-  border-radius: 8px;
+  border-radius: 16px;
   padding: 2rem;
-  width: 90%;
+  width: 100%;
   max-width: 500px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+  margin: auto;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .modal-content h3 {
   margin: 0 0 1.5rem 0;
-  color: #2c3e50;
+  color: #2d3748;
+  font-weight: 700;
 }
 
 /* Form */
@@ -229,17 +308,25 @@
 .form-group textarea {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 1rem;
-  transition: border-color 0.2s ease;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+  background: #f7fafc;
+  color: #2d3748;
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: #a0aec0;
 }
 
 .form-group input:focus,
 .form-group textarea:focus {
   outline: none;
   border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background: white;
+  box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
 }
 
 .form-actions {
@@ -259,27 +346,32 @@
 }
 
 .form-actions button:first-child {
-  background: #f3f4f6;
-  color: #374151;
+  background: #e2e8f0;
+  color: #4a5568;
+  font-weight: 600;
 }
 
 .form-actions button:first-child:hover {
-  background: #e5e7eb;
+  background: #cbd5e0;
 }
 
 .form-actions button:last-child {
-  background: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
 }
 
 .form-actions button:last-child:hover {
-  background: #5a67d8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 /* Drag and Drop States */
 .kanban-column.drag-over {
-  background: #f8f9ff;
+  background: rgba(102, 126, 234, 0.05);
   border: 2px dashed #667eea;
+  transform: scale(1.02);
 }
 
 /* Responsive */
