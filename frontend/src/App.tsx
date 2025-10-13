@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Board as BoardType, Task } from './types'
 import { Board } from './components/Board'
+import { Toast, ToastProps } from './components/Toast'
+import { Modal } from './components/Modal'
 import { mockBoard, mockTasks } from './data/mockData'
 import './App.css'
 import './components/Kanban.css'
@@ -18,6 +20,16 @@ function App() {
   const [exportFields, setExportFields] = useState<string[]>([])
   const [exportStatus, setExportStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [exportMessage, setExportMessage] = useState<string>('')
+  const [toasts, setToasts] = useState<ToastProps[]>([])
+
+  const showToast = (type: ToastProps['type'], title: string, message?: string) => {
+    const id = Date.now().toString()
+    setToasts(prev => [...prev, { id, type, title, message, onClose: removeToast }])
+  }
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }
 
   // Cargar datos iniciales del backend al montar el componente
   useEffect(() => {
@@ -71,10 +83,10 @@ function App() {
   const handleCreateTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       await createTask(task)
-      // WebSocket actualizará el estado automáticamente
+      showToast('success', 'Tarea creada', 'La tarea se ha creado correctamente')
     } catch (error) {
       console.error('Error creating task:', error)
-      // Fallback: agregar localmente si falla el API
+      showToast('error', 'Error', 'No se pudo crear la tarea')
       const mockTask: Task = {
         ...task,
         id: Date.now().toString(),
@@ -111,25 +123,25 @@ function App() {
       setExportMessage('Debes seleccionar un tablero y un email válido.')
       return
     }
-
-    setExportStatus('loading')
-    setExportMessage('Enviando solicitud de exportación...')
-
     try {
+      setExportStatus('loading')
+      setExportMessage('Enviando solicitud...')
+
       await exportBacklog({
         boardId: activeBoardId,
         email: exportEmail,
-        fields: exportFields.length > 0 ? exportFields : undefined
+        fields: exportFields.length > 0 ? exportFields : undefined,
       })
+
       setExportStatus('success')
-      setExportMessage('Exportación solicitada correctamente. Revisa tu email.')
-      setTimeout(() => {
-        setIsExportModalOpen(false)
-      }, 1500)
+      setExportMessage('✅ Exportación solicitada con éxito. Revisa tu email.')
+      showToast('success', 'Exportación iniciada', `El CSV se enviará a ${exportEmail}`)
+      setTimeout(() => setIsExportModalOpen(false), 2000)
     } catch (error) {
       console.error('Error exporting backlog:', error)
       setExportStatus('error')
       setExportMessage('No se pudo solicitar la exportación. Intenta nuevamente.')
+      showToast('error', 'Error en exportación', 'No se pudo procesar la solicitud')
     }
   }
 
@@ -137,9 +149,10 @@ function App() {
     try {
       const updatedTask = await updateTask(id, updates)
       setTasks(prev => prev.map(t => t.id === id ? updatedTask : t))
+      showToast('success', 'Tarea actualizada', 'Los cambios se guardaron correctamente')
     } catch (error) {
       console.error('Error updating task:', error)
-      // Fallback: actualizar localmente
+      showToast('error', 'Error', 'No se pudo actualizar la tarea')
       setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates, updatedAt: new Date() } : t))
     }
   }
@@ -148,9 +161,10 @@ function App() {
     try {
       await deleteTask(id)
       setTasks(prev => prev.filter(t => t.id !== id))
+      showToast('success', 'Tarea eliminada', 'La tarea se eliminó correctamente')
     } catch (error) {
       console.error('Error deleting task:', error)
-      // Fallback: eliminar localmente
+      showToast('error', 'Error', 'No se pudo eliminar la tarea')
       setTasks(prev => prev.filter(t => t.id !== id))
     }
   }
@@ -183,6 +197,7 @@ function App() {
         const exists = prev.some(t => t.id === normalized.id)
         if (exists) return prev
 
+        showToast('info', 'Nueva tarea', `Se agregó "${task.title}" al tablero`)
         return [...prev, normalized]
       })
     }
@@ -201,6 +216,7 @@ function App() {
     // Sincronización en tiempo real: tarea eliminada
     const handleTaskDeleted = (task: TaskDeletedEvent) => {
       setTasks(prev => prev.filter(taskItem => taskItem.id !== task.id))
+      showToast('info', 'Tarea eliminada', 'Una tarea fue eliminada del tablero')
     }
 
     // Sincronización en tiempo real: tablero actualizado/creado/eliminado
@@ -286,63 +302,71 @@ function App() {
   return (
     <div className="App">
       <header className="app-header">
-        <h1>Kanban UseTeam</h1>
-        <p>Tablero Kanban colaborativo</p>
-        <button
-          onClick={handleOpenExportModal}
-          style={{
-            marginTop: '6px',
-            padding: '8px 18px',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '0.8rem',
-            boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
-            transition: 'all 0.3s ease'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)'
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)'
-          }}
-        >
-          📤 Exportar backlog
-        </button>
-        {boards.length > 1 && (
-          <div style={{ marginTop: '8px', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-            {boards.map((board, index) => (
-              <button
-                key={board.id}
-                onClick={() => handleSwitchBoard(index)}
-                style={{
-                  padding: '6px 14px',
-                  background: index === activeBoardIndex 
-                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
-                    : 'rgba(255, 255, 255, 0.8)',
-                  color: index === activeBoardIndex ? 'white' : '#4a5568',
-                  border: index === activeBoardIndex ? 'none' : '2px solid rgba(102, 126, 234, 0.2)',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontWeight: index === activeBoardIndex ? '600' : '500',
-                  fontSize: '0.8rem',
-                  transition: 'all 0.3s ease',
-                  boxShadow: index === activeBoardIndex 
-                    ? '0 2px 8px rgba(102, 126, 234, 0.3)' 
-                    : 'none'
-                }}
-              >
-                {board.title}
-              </button>
-            ))}
+        <div className="app-header-left">
+          <div>
+            <h1>Kanban UseTeam</h1>
+            <p>Tablero Kanban colaborativo en tiempo real</p>
           </div>
-        )}
+        </div>
+        <div className="app-header-right">
+          {boards.length > 1 && boards.map((board, index) => (
+            <button
+              key={board.id}
+              onClick={() => handleSwitchBoard(index)}
+              style={{
+                padding: '6px 14px',
+                background: index === activeBoardIndex 
+                  ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' 
+                  : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: index === activeBoardIndex ? 'none' : '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: index === activeBoardIndex ? '600' : '500',
+                fontSize: '0.8rem',
+                transition: 'all 0.3s ease',
+                boxShadow: index === activeBoardIndex 
+                  ? '0 2px 8px rgba(59, 130, 246, 0.4)' 
+                  : 'none'
+              }}
+            >
+              {board.title}
+            </button>
+          ))}
+          <button
+            onClick={handleOpenExportModal}
+            style={{
+              padding: '8px 16px',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '0.8rem',
+              boxShadow: '0 2px 8px rgba(59, 130, 246, 0.4)',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 4px 16px rgba(59, 130, 246, 0.5)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.4)'
+            }}
+          >
+            📤 Exportar
+          </button>
+        </div>
       </header>
+
+      {/* Toast Notifications */}
+      <div className="toast-container">
+        {toasts.map(toast => (
+          <Toast key={toast.id} {...toast} />
+        ))}
+      </div>
 
       <main className="app-main">
         <div className="boards-container">
@@ -365,80 +389,24 @@ function App() {
       </main>
 
       {isExportModalOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000
-          }}
-        >
-          <form
-            onSubmit={handleExportSubmit}
-            style={{
-              background: 'white',
-              padding: '28px',
-              borderRadius: '16px',
-              width: '440px',
-              maxWidth: '90vw',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '18px'
-            }}
-          >
-            <h2 style={{ margin: 0, color: '#2d3748', fontWeight: '700', fontSize: '1.5rem' }}>Exportar backlog</h2>
-            <p style={{ margin: 0, color: '#718096', fontSize: '0.95rem' }}>
-              Ingresa el email que recibirá el CSV generado por N8N.
-            </p>
+        <Modal onClose={handleCloseExportModal}>
+          <form className="modal-export" onSubmit={handleExportSubmit}>
+            <h2>Exportar backlog</h2>
+            <p>Ingresa el email que recibirá el CSV generado por N8N.</p>
 
-            <label style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <span style={{ fontWeight: 600, color: '#374151' }}>Email destino</span>
+            <label className="form-group" style={{ marginBottom: 0 }}>
+              <span>Email destino</span>
               <input
                 type="email"
                 value={exportEmail}
                 onChange={e => setExportEmail(e.target.value)}
                 required
                 placeholder="usuario@dominio.com"
-                style={{
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: '2px solid #e2e8f0',
-                  background: '#f7fafc',
-                  fontSize: '0.95rem',
-                  transition: 'all 0.2s ease',
-                  color: '#2d3748'
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#667eea'
-                  e.currentTarget.style.background = 'white'
-                  e.currentTarget.style.boxShadow = '0 0 0 4px rgba(102, 126, 234, 0.1)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e2e8f0'
-                  e.currentTarget.style.background = '#f7fafc'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
               />
             </label>
 
-            <fieldset
-              style={{
-                border: '2px solid #e2e8f0',
-                borderRadius: '12px',
-                padding: '16px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10px',
-                background: '#f7fafc',
-                color: '#2d3748'
-              }}
-            >
-              <legend style={{ padding: '0 10px', color: '#667eea', fontWeight: 700, fontSize: '0.875rem' }}>Campos a exportar (opcional)</legend>
+            <fieldset className="modal-fieldset">
+              <legend>Campos a exportar (opcional)</legend>
               {[
                 { key: 'title', label: 'Título' },
                 { key: 'description', label: 'Descripción' },
@@ -446,7 +414,7 @@ function App() {
                 { key: 'position', label: 'Posición' },
                 { key: 'createdAt', label: 'Fecha de creación' }
               ].map(field => (
-                <label key={field.key} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <label key={field.key}>
                   <input
                     type="checkbox"
                     checked={exportFields.includes(field.key)}
@@ -455,84 +423,33 @@ function App() {
                   {field.label}
                 </label>
               ))}
-              <small style={{ color: '#a0aec0', fontSize: '0.8rem' }}>Si no seleccionas ninguno, se enviarán todos los campos por defecto.</small>
+              <small>Si no seleccionas ninguno, se enviarán todos los campos por defecto.</small>
             </fieldset>
 
             {exportStatus !== 'idle' && (
               <div
-                style={{
-                  padding: '12px',
-                  borderRadius: '8px',
-                  backgroundColor:
-                    exportStatus === 'loading'
-                      ? 'rgba(102, 126, 234, 0.1)'
-                      : exportStatus === 'success'
-                        ? 'rgba(72, 187, 120, 0.1)'
-                        : 'rgba(239, 68, 68, 0.1)',
-                  color:
-                    exportStatus === 'loading'
-                      ? '#667eea'
-                      : exportStatus === 'success'
-                        ? '#38a169'
-                        : '#ef4444',
-                  fontWeight: '500',
-                  fontSize: '0.9rem'
-                }}
+                className={`modal-status ${
+                  exportStatus === 'loading'
+                    ? 'is-loading'
+                    : exportStatus === 'success'
+                      ? 'is-success'
+                      : 'is-error'
+                }`}
               >
                 {exportMessage}
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button
-                type="button"
-                onClick={handleCloseExportModal}
-                style={{
-                  padding: '12px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: '#e2e8f0',
-                  color: '#4a5568',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '0.95rem',
-                  transition: 'all 0.2s ease'
-                }}
-                disabled={exportStatus === 'loading'}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#cbd5e0'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#e2e8f0'}
-              >
+            <div className="modal-actions">
+              <button type="button" onClick={handleCloseExportModal} disabled={exportStatus === 'loading'}>
                 Cancelar
               </button>
-              <button
-                type="submit"
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: 'white',
-                  fontWeight: '600',
-                  fontSize: '0.95rem',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
-                  transition: 'all 0.3s ease'
-                }}
-                disabled={exportStatus === 'loading'}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)'
-                }}
-              >
-                {exportStatus === 'loading' ? 'Enviando...' : 'Enviar exportación'}
+              <button type="submit" disabled={exportStatus === 'loading'}>
+                Enviar exportación
               </button>
             </div>
           </form>
-        </div>
+        </Modal>
       )}
     </div>
   )

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Column as ColumnType, Task } from '../types'
 import { Card } from './Card'
 import { TaskForm } from './TaskForm'
+import { Modal } from './Modal'
 
 interface ColumnProps {
   column: ColumnType
@@ -83,7 +84,7 @@ export const Column: React.FC<ColumnProps> = ({
           <Card
             key={task.id}
             task={task}
-            onDragStart={() => onDragStart?.(task)}
+            onDragStart={onDragStart}
             onDragOver={(e: React.DragEvent<HTMLDivElement>) => {
               e.preventDefault()
               e.stopPropagation()
@@ -99,24 +100,26 @@ export const Column: React.FC<ColumnProps> = ({
             <p>Sin tareas</p>
           </div>
         )}
-
-        <button
-          className="add-task-button"
-          onClick={handleCreateTask}
-          title="Agregar nueva tarea"
-        >
-          + Agregar tarea
-        </button>
       </div>
+
+      <button
+        className="add-task-button"
+        onClick={handleCreateTask}
+        title="Agregar nueva tarea"
+      >
+        + Agregar tarea
+      </button>
 
       {/* Task Edit Modal */}
       {editingTask && (
-        <TaskForm
-          title="Editar tarea"
-          initialData={editingTask}
-          onSubmit={handleEditTaskSubmit}
-          onCancel={() => setEditingTask(null)}
-        />
+        <Modal onClose={() => setEditingTask(null)}>
+          <TaskForm
+            title="Editar tarea"
+            initialData={editingTask}
+            onSubmit={handleEditTaskSubmit}
+            onCancel={() => setEditingTask(null)}
+          />
+        </Modal>
       )}
     </div>
   )
