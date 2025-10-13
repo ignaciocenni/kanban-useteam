@@ -1,98 +1,94 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend - Kanban UseTeam
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## 📌 Resumen
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+API REST + WebSocket construida con **NestJS** para gestionar tableros y tareas del proyecto Kanban. Expone endpoints para CRUD de boards/tasks, sincronización en tiempo real mediante Socket.IO y un endpoint para disparar la exportación del backlog a través de N8N.
 
-## Description
+Base URL por defecto: `http://localhost:3000`
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## ✅ Requisitos
 
-## Project setup
+- Node.js ≥ 18
+- MongoDB en ejecución (puerto sugerido `27018` via Docker)
+- Instancia de N8N opcional para la exportación (puede correr en Docker)
+
+## ⚙️ Instalación y ejecución
 
 ```bash
-$ npm install
+cd backend
+npm install
+npm run start:dev
 ```
 
-## Compile and run the project
+El modo watch (`start:dev`) expone la API REST y los eventos WebSocket en el mismo puerto (`3000`).
+
+## 🌱 Variables de entorno
+
+Define un archivo `.env` en `backend/` (puedes copiarlo desde `../.env.example`).
+
+| Variable | Valor por defecto | Descripción |
+| --- | --- | --- |
+| `MONGODB_URI` | `mongodb://localhost:27018/kanban-useteam` | Cadena de conexión para MongoDB. |
+| `PORT` | `3000` | Puerto HTTP y WebSocket del servidor NestJS. |
+| `NODE_ENV` | `development` | Entorno de ejecución. |
+| `CORS_ORIGIN` | `http://localhost:5173` | Origen permitido para el frontend (`EventsGateway`). |
+| `N8N_WEBHOOK_URL` | `http://localhost:5678/webhook/kanban-export` | Webhook que consumirá el flujo de N8N. |
+
+## 📦 Scripts útiles
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm run start        # ejecuta NestJS sin watch
+npm run start:dev    # watch mode (desarrollo)
+npm run start:prod   # usa el build de dist/
+npm run build        # compila a JavaScript (dist/)
+npm run lint         # lint + formato
 ```
 
-## Run tests
+## 🔗 Endpoints principales
 
-```bash
-# unit tests
-$ npm run test
+### Tableros (`src/boards/boards.controller.ts`)
 
-# e2e tests
-$ npm run test:e2e
+- `GET /boards` — listar tableros.
+- `POST /boards` — crear tablero (`title`, `description?`, `columns`).
+- `GET /boards/:id` — obtener tablero por ID.
+- `PATCH /boards/:id` — actualizar datos o columnas.
+- `DELETE /boards/:id` — eliminar tablero.
 
-# test coverage
-$ npm run test:cov
-```
+### Tareas (`src/tasks/tasks.controller.ts`)
 
-## Deployment
+- `GET /tasks?boardId=` — listar tareas (filtrado opcional por board).
+- `GET /tasks/board/:boardId` — tareas de un tablero.
+- `GET /tasks/:id` — detalle de tarea.
+- `POST /tasks` — crear tarea (`title`, `description?`, `boardId`, `column`, `position`).
+- `PATCH /tasks/:id` — actualizar tarea.
+- `PATCH /tasks/:id/position` — actualizar columna/posición (drag & drop).
+- `DELETE /tasks/:id` — eliminar tarea.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Exportaciones (`src/exports/exports.controller.ts`)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- `POST /exports/backlog` — dispara la automatización de exportación. Payload `{ boardId, email, fields? }`.
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+## 🔔 Eventos en tiempo real
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+`src/events/events.gateway.ts` expone los eventos Socket.IO siguientes:
 
-## Resources
+- `task.created`
+- `task.updated`
+- `task.deleted`
+- `board.updated`
 
-Check out a few resources that may come in handy when working with NestJS:
+El frontend (Vite + React) se conecta con `socket.io-client` utilizando la misma URL base (`http://localhost:3000`).
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+## 🧪 Verificación rápida
 
-## Support
+- `curl http://localhost:3000/boards` — confirma que el backend responde y que la conexión a MongoDB está activa.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+## 🛠️ Troubleshooting
 
-## Stay in touch
+- **MongoDB**: confirma que el contenedor esté activo (`docker ps`) y que `MONGODB_URI` apunte al puerto correcto.
+- **CORS/WebSockets**: ajusta `CORS_ORIGIN` si el frontend corre en otra URL.
+- **N8N**: si N8N está en Docker, utiliza `http://host.docker.internal:3000` dentro del workflow (ver `SETUP.md`).
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Consulta `../SETUP.md` y `../n8n/setup-instructions.md` para instrucciones completas del ecosistema.
