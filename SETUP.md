@@ -153,7 +153,7 @@ docker run -it --rm \
 
 ### 3. Configurar credenciales SMTP
 
-El workflow requiere credenciales SMTP para enviar emails:
+El workflow requiere credenciales SMTP para enviar emails (se configuran manualmente en la UI de n8n y no se versionan):
 
 1. Abre el nodo **Send Email**
 2. Click en **Credentials → Create New → SMTP account**
@@ -190,7 +190,7 @@ curl -X POST http://localhost:5678/webhook/kanban-export \
 
 Verifica:
 - Ejecución exitosa en **Executions** de N8N
-- Email recibido con archivo CSV adjunto
+- Email recibido con archivo **CSV** adjunto (sin formato visual)
 
 ---
 
