@@ -1,16 +1,25 @@
-import React, { useState } from 'react'
-import { Board as BoardType, Task } from '../types'
-import { Column } from './Column'
-import { TaskForm } from './TaskForm'
-import { Modal } from './Modal'
+import React, { useState } from 'react';
+import type { BoardContract } from '../contracts/board.contract';
+import type { Task } from '../types';
+import type { Column as ColumnType } from '../types';
+import { Column } from './Column';
+import { TaskForm } from './TaskForm';
+import { Modal } from './Modal';
+import { useKanbanStore } from '../store/useKanbanStore';
+
+type BoardWithColumns = BoardContract & { columns?: ColumnType[] };
 
 interface BoardProps {
-  board: BoardType
-  tasks: Task[]
-  onCreateTask?: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
-  onUpdateTask?: (id: string, updates: Partial<Task>) => Promise<void>
-  onDeleteTask?: (id: string) => Promise<void>
-  onUpdateTaskPosition?: (id: string, column: string, position: number) => Promise<void>
+  board: BoardWithColumns;
+  tasks: Task[];
+  onCreateTask?: (task: Partial<Task>) => Promise<void>;
+  onUpdateTask?: (id: string, updates: Partial<Task>) => Promise<void>;
+  onDeleteTask?: (id: string) => Promise<void>;
+  onUpdateTaskPosition?: (
+    id: string,
+    columnId: string,
+    position: number
+  ) => Promise<void>;
 }
 
 export const Board: React.FC<BoardProps> = ({
@@ -19,125 +28,121 @@ export const Board: React.FC<BoardProps> = ({
   onCreateTask,
   onUpdateTask,
   onDeleteTask,
-  onUpdateTaskPosition
+  onUpdateTaskPosition,
 }) => {
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null)
-  const [showCreateForm, setShowCreateForm] = useState<string | null>(null)
-  const [dragOverTask, setDragOverTask] = useState<string | null>(null)
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState<string | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
+
+  // Store (solo reorder optimista)
+  const reorderTaskLocally = useKanbanStore(
+    (state) => state.reorderTaskLocally
+  );
+
+  /* =======================
+     Drag handlers
+     ======================= */
 
   const handleDragStart = (task: Task) => {
-    setDraggedTask(task)
-  }
+    setDraggedTask(task);
+  };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
 
-  /**
-   * Maneja el drop de una tarea en una columna
-   * Calcula la nueva posición considerando:
-   * - Si se suelta al final de la columna (sin target específico)
-   * - Si se suelta sobre otra tarea (reordenamiento)
-   * - Si se arrastra hacia arriba o hacia abajo en la misma columna
-   */
-  const handleDrop = async (targetColumn: string) => {
-    if (!draggedTask) return
+  const handleDrop = async (targetColumnId: string) => {
+    if (!draggedTask) return;
 
-    const currentTasksInColumn = tasks
-      .filter(t => t.column === targetColumn)
-      .sort((a, b) => a.position - b.position)
+    const columnTasksRaw = tasks
+      .filter((t) => t.columnId === targetColumnId)
+      .sort((a, b) => a.position - b.position);
 
-    // Caso 1: Drop al final de la columna (sin target específico)
-    if (!dragOverTask) {
-      if (draggedTask.column === targetColumn) {
-        setDraggedTask(null)
-        setDragOverTask(null)
-        return
+    const isSameColumn = draggedTask.columnId === targetColumnId;
+    const baseColumnTasks = isSameColumn
+      ? columnTasksRaw.filter((t) => t.id !== draggedTask.id)
+      : columnTasksRaw;
+
+    // =========================
+    // CALCULO DE newPosition
+    // =========================
+    let newPosition: number;
+
+    if (!dragOverTaskId) {
+      // Drop en zona vacía → fondo de columna
+      newPosition = baseColumnTasks.length;
+    } else {
+      const overIndex = baseColumnTasks.findIndex((t) => t.id === dragOverTaskId);
+
+      if (overIndex === -1) {
+        newPosition = baseColumnTasks.length;
+      } else {
+        newPosition = overIndex;
       }
-
-      const newPosition = currentTasksInColumn.length
-      try {
-        await onUpdateTaskPosition?.(draggedTask.id, targetColumn, newPosition)
-      } catch (error) {
-        console.error('Error updating task position:', error)
-      }
-
-      setDraggedTask(null)
-      setDragOverTask(null)
-      return
     }
 
-    // Caso 2: Drop sobre otra tarea (reordenamiento)
-    const targetTask = currentTasksInColumn.find(t => t.id === dragOverTask)
+    // Clamp defensivo
+    newPosition = Math.max(0, Math.min(newPosition, baseColumnTasks.length));
 
-    if (!targetTask) {
-      // Fallback: mover al final si no se encuentra la tarea target
-      const newPosition = currentTasksInColumn.length
-      try {
-        await onUpdateTaskPosition?.(draggedTask.id, targetColumn, newPosition)
-      } catch (error) {
-        console.error('Error updating task position:', error)
-      }
+    // =========================
+    // REORDER OPTIMISTA
+    // =========================
+    reorderTaskLocally(draggedTask.id, targetColumnId, newPosition);
 
-      setDraggedTask(null)
-      setDragOverTask(null)
-      return
-    }
-
-    // Calcular nueva posición considerando dirección del drag
-    const tasksWithoutDragged = currentTasksInColumn.filter(t => t.id !== draggedTask.id)
-    const targetIndexInFilteredArray = tasksWithoutDragged.findIndex(t => t.id === dragOverTask)
-    const draggedIndex = currentTasksInColumn.findIndex(t => t.id === draggedTask.id)
-    const targetIndex = currentTasksInColumn.findIndex(t => t.id === dragOverTask)
-    const isDraggingDown =
-      draggedTask.column === targetColumn &&
-      draggedIndex !== -1 &&
-      targetIndex !== -1 &&
-      draggedIndex < targetIndex
-
-    let newPosition = targetIndexInFilteredArray
-    if (isDraggingDown) {
-      newPosition = targetIndexInFilteredArray + 1
-    }
-
+    // =========================
+    // BACKEND
+    // =========================
     try {
-      await onUpdateTaskPosition?.(draggedTask.id, targetColumn, newPosition)
+      await onUpdateTaskPosition?.(draggedTask.id, targetColumnId, newPosition);
     } catch (error) {
-      console.error('Error updating task position:', error)
+      console.error('Error updating task position:', error);
     }
 
-    setDraggedTask(null)
-    setDragOverTask(null)
-  }
+    // Reset estado drag
+    setDraggedTask(null);
+    setDragOverTaskId(null);
+  };
 
-  const handleCreateTask = (column: string) => {
-    setShowCreateForm(column)
-  }
+  /* =======================
+     Create task
+     ======================= */
+
+  const handleCreateTask = (columnId: string) => {
+    setShowCreateForm(columnId);
+  };
 
   const handleCreateTaskSubmit = async (taskData: Partial<Task>) => {
-    if (taskData.title && showCreateForm) {
-      try {
-        const newTask = {
-          title: taskData.title,
-          description: taskData.description || '',
-          boardId: board.id,
-          column: showCreateForm,
-          position: tasks.filter(t => t.column === showCreateForm).length
-        }
-        await onCreateTask?.(newTask)
-        setShowCreateForm(null)
-      } catch (error) {
-        console.error('Error creating task:', error)
-      }
-    }
-  }
+    if (!taskData.title || !showCreateForm) return;
 
-  const getTasksByColumn = (columnTitle: string): Task[] => {
-    return tasks
-      .filter(task => task.column === columnTitle)
-      .sort((a, b) => a.position - b.position)
-  }
+    try {
+      const newTask = {
+        title: taskData.title,
+        description: taskData.description || '',
+        boardId: board.id,
+        columnId: showCreateForm,
+        position: tasks.filter((t) => t.columnId === showCreateForm).length,
+      };
+
+      await onCreateTask?.(newTask);
+      setShowCreateForm(null);
+    } catch (error) {
+      console.error('Error creating task:', error);
+    }
+  };
+
+  /* =======================
+     Helpers
+     ======================= */
+
+  const getTasksByColumn = (columnId: string): Task[] =>
+    tasks
+      .filter((task) => task.columnId === columnId)
+      .sort((a, b) => a.position - b.position);
+
+  /* =======================
+     Render
+     ======================= */
 
   return (
     <div className="kanban-board">
@@ -149,23 +154,22 @@ export const Board: React.FC<BoardProps> = ({
       </div>
 
       <div className="board-columns">
-        {board.columns.map((column, index) => (
+        {(board.columns || []).map((column: ColumnType) => (
           <Column
-            key={column.id || `column-${index}`}
+            key={column.id}
             column={column}
-            tasks={getTasksByColumn(column.title)}
+            tasks={getTasksByColumn(column.id)}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onDragStart={handleDragStart}
             onCreateTask={handleCreateTask}
             onEditTask={onUpdateTask}
             onDeleteTask={onDeleteTask}
-            onDragOverTask={setDragOverTask}
+            onDragOverTask={setDragOverTaskId}
           />
         ))}
       </div>
 
-      {/* Task Creation Modal */}
       {showCreateForm && (
         <Modal onClose={() => setShowCreateForm(null)}>
           <TaskForm
@@ -176,5 +180,5 @@ export const Board: React.FC<BoardProps> = ({
         </Modal>
       )}
     </div>
-  )
-}
+  );
+};

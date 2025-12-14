@@ -1,10 +1,18 @@
-// src/types/index.ts
+/**
+ * Frontend domain types (UI / Store / Components).
+ *
+ * These types represent the internal state and behavior of the frontend.
+ * They MUST NOT be used for API or WebSocket payloads.
+ *
+ * For backend integration (REST / WS), use contracts from '../contracts'.
+ */
+
 export interface Task {
   id: string
   boardId: string
   title: string
   description?: string
-  column: string
+  columnId: string
   position: number
   createdAt: Date
   updatedAt: Date

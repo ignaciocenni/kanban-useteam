@@ -1,124 +1,138 @@
-import type { Board, Task } from '../types'
-import { normalizeColumns } from '../utils/columns'
+import type { BoardContract } from '../contracts/board.contract';
+import type { Task } from '../types';
+import { fromTaskContract, toCreateTaskContract, toUpdateTaskContract } from '../mappers/task.mapper';
+import type { TaskContract } from '../contracts/task.contract';
+import { getClientId } from './clientId';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-/**
- * Normaliza un tablero desde el formato de MongoDB al formato del frontend
- * Convierte _id a id y normaliza columnas
- */
-function normalizeBoard(board: any): Board {
+function buildHeaders() {
   return {
-    id: board.id || board._id,
-    title: board.title,
-    description: board.description,
-    columns: normalizeColumns(board.columns),
-    createdAt: new Date(board.createdAt),
-    updatedAt: new Date(board.updatedAt),
-  }
+    'Content-Type': 'application/json',
+    'x-client-id': getClientId(),
+  };
 }
 
-/**
- * Normaliza una tarea desde el formato de MongoDB al formato del frontend
- * Convierte _id a id y garantiza tipos consistentes
- */
-function normalizeTask(task: any): Task {
-  return {
-    id: task.id || task._id,
-    boardId: task.boardId || task.board?.id,
-    title: task.title,
-    description: task.description,
-    column: task.column,
-    position: task.position,
-    createdAt: new Date(task.createdAt),
-    updatedAt: new Date(task.updatedAt),
-  }
+/* ============================================================
+   📌 BOARDS
+   ============================================================ */
+
+export async function getBoards(): Promise<BoardContract[]> {
+  const res = await fetch(`${API_URL}/boards`, {
+    headers: buildHeaders(),
+  });
+
+  if (!res.ok) throw new Error('Failed to fetch boards');
+
+  const data = await res.json();
+  return Array.isArray(data) ? data : [data];
 }
 
-export async function getBoards(): Promise<Board[]> {
-  const res = await fetch(`${API_URL}/boards`)
-  if (!res.ok) throw new Error('Failed to fetch boards')
-  const data = await res.json()
-  return Array.isArray(data) ? data.map(normalizeBoard) : [normalizeBoard(data)]
-}
+/* ============================================================
+   📌 TASKS
+   ============================================================ */
 
 export async function getTasks(boardId?: string): Promise<Task[]> {
-  const qs = boardId ? `?boardId=${encodeURIComponent(boardId)}` : ''
-  const res = await fetch(`${API_URL}/tasks${qs}`)
-  if (!res.ok) throw new Error('Failed to fetch tasks')
-  const data = await res.json()
-  return Array.isArray(data) ? data.map(normalizeTask) : [normalizeTask(data)]
+  const qs = boardId ? `?boardId=${encodeURIComponent(boardId)}` : '';
+
+  const res = await fetch(`${API_URL}/tasks${qs}`, {
+    headers: buildHeaders(),
+  });
+
+  if (!res.ok) throw new Error('Failed to fetch tasks');
+
+  const data = await res.json();
+  const list: TaskContract[] = Array.isArray(data) ? data : [data];
+  return list.map(fromTaskContract);
 }
 
-export async function createTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>): Promise<Task> {
+export async function createTask(
+  task: Partial<Task>
+): Promise<Task> {
   const res = await fetch(`${API_URL}/tasks`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(task),
-  })
-  if (!res.ok) throw new Error('Failed to create task')
-  const data = await res.json()
-  return normalizeTask(data)
+    headers: buildHeaders(),
+    body: JSON.stringify(toCreateTaskContract(task)),
+  });
+
+  if (!res.ok) throw new Error('Failed to create task');
+
+  const json: TaskContract = await res.json();
+  return fromTaskContract(json);
 }
 
-export async function updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt' | 'updatedAt'>>): Promise<Task> {
+export async function updateTask(
+  id: string,
+  updates: Partial<Task>
+): Promise<Task> {
   const res = await fetch(`${API_URL}/tasks/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  })
-  if (!res.ok) throw new Error('Failed to update task')
-  const data = await res.json()
-  return normalizeTask(data)
+    headers: buildHeaders(),
+    body: JSON.stringify(toUpdateTaskContract(updates)),
+  });
+
+  if (!res.ok) throw new Error('Failed to update task');
+
+  const json: TaskContract = await res.json();
+  return fromTaskContract(json);
 }
 
 export async function deleteTask(id: string): Promise<void> {
   const res = await fetch(`${API_URL}/tasks/${id}`, {
     method: 'DELETE',
-  })
-  if (!res.ok) throw new Error('Failed to delete task')
+    headers: buildHeaders(),
+  });
+
+  if (!res.ok) throw new Error('Failed to delete task');
 }
 
 /**
- * Actualiza la posición de una tarea (drag & drop)
- * El backend recalcula las posiciones de todas las tareas afectadas
+ * Drag & Drop: backend recalcula posiciones y devuelve tarea actualizada
  */
-export async function updateTaskPosition(id: string, column: string, position: number): Promise<Task> {
+export async function updateTaskPosition(
+  id: string,
+  columnId: string,
+  position: number
+): Promise<Task> {
   const res = await fetch(`${API_URL}/tasks/${id}/position`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ column, position }),
-  })
-  if (!res.ok) throw new Error('Failed to update task position')
-  const data = await res.json()
-  return normalizeTask(data)
+    headers: buildHeaders(),
+    body: JSON.stringify({ column: columnId, position }),
+  });
+
+  if (!res.ok) throw new Error('Failed to update task position');
+
+  const json: TaskContract = await res.json();
+  return fromTaskContract(json);
 }
+
+/* ============================================================
+   📌 EXPORTAR BACKLOG (N8N)
+   ============================================================ */
 
 export interface ExportBacklogPayload {
-  boardId: string
-  email: string
-  fields?: string[]
+  boardId: string;
+  email: string;
+  fields?: string[];
 }
 
-/**
- * Dispara la exportación del backlog vía N8N
- * El backend llama al webhook de N8N que genera CSV y envía por email
- */
-export async function exportBacklog(payload: ExportBacklogPayload): Promise<any> {
+export async function exportBacklog(
+  payload: ExportBacklogPayload
+): Promise<{ success: boolean; message?: string; data?: unknown }> {
   const res = await fetch(`${API_URL}/exports/backlog`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     body: JSON.stringify(payload),
-  })
+  });
 
   if (!res.ok) {
-    const errorText = await res.text()
-    throw new Error(`Failed to trigger export: ${res.status} ${errorText}`)
+    const errorText = await res.text();
+    throw new Error(`Failed to trigger export: ${res.status} ${errorText}`);
   }
 
   try {
-    return await res.json()
-  } catch (error) {
-    return { success: true }
+    return await res.json();
+  } catch {
+    return { success: true };
   }
 }

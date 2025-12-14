@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Test WebSocket Kanban</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+          sans-serif;
+        background: #121212;
+        color: #f5f5f5;
+        margin: 0;
+        padding: 16px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      .status {
+        margin-bottom: 12px;
+        font-size: 14px;
+      }
+      .status span {
+        font-weight: bold;
+      }
+      button {
+        margin-right: 8px;
+        padding: 6px 12px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        opacity: 0.9;
+      }
+      #logs {
+        margin-top: 12px;
+        padding: 8px;
+        background: #1e1e1e;
+        border-radius: 4px;
+        max-height: 70vh;
+        overflow-y: auto;
+        font-family: 'Consolas', 'Fira Code', monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .log-line {
+        margin-bottom: 4px;
+      }
+      .event-name {
+        color: #4fc3f7;
+        font-weight: bold;
+      }
+      .time {
+        color: #9e9e9e;
+        margin-right: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Test WebSocket – Kanban UseTeam</h1>
+    <div class="status">Estado: <span id="status">Desconectado</span></div>
+
+    <button id="btn-reconnect">Reconectar</button>
+    <button id="btn-clear">Limpiar logs</button>
+
+    <div id="logs"></div>
+
+    <!-- Cliente de Socket.IO desde CDN -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <script>
+      const statusEl = document.getElementById('status');
+      const logsEl = document.getElementById('logs');
+      const btnReconnect = document.getElementById('btn-reconnect');
+      const btnClear = document.getElementById('btn-clear');
+
+      let socket;
+
+      function log(eventName, data) {
+        const line = document.createElement('div');
+        line.className = 'log-line';
+
+        const time = new Date().toLocaleTimeString();
+        line.innerHTML =
+          '<span class="time">[' +
+          time +
+          ']</span>' +
+          (eventName
+            ? '<span class="event-name">' + eventName + ':</span> '
+            : '') +
+          '<span>' +
+          (data ? JSON.stringify(data) : '') +
+          '</span>';
+
+        logsEl.appendChild(line);
+        logsEl.scrollTop = logsEl.scrollHeight;
+      }
+
+      function setStatus(text, color) {
+        statusEl.textContent = text;
+        statusEl.style.color = color || '#f5f5f5';
+      }
+
+      function connect() {
+        if (socket && socket.connected) {
+          socket.disconnect();
+        }
+
+        socket = io('http://localhost:3000', {
+          transports: ['websocket'],
+        });
+
+        socket.on('connect', () => {
+          setStatus('Conectado (' + socket.id + ')', '#4caf50');
+          log('connect', { socketId: socket.id });
+        });
+
+        socket.on('disconnect', (reason) => {
+          setStatus('Desconectado (' + reason + ')', '#ff9800');
+          log('disconnect', { reason });
+        });
+
+        socket.on('connect_error', (err) => {
+          setStatus('Error de conexión', '#f44336');
+          log('connect_error', { message: err.message });
+        });
+
+        // Eventos de boards
+        socket.on('board.created', (payload) => {
+          log('board.created', payload);
+        });
+
+        socket.on('board.updated', (payload) => {
+          log('board.updated', payload);
+        });
+
+        socket.on('board.deleted', (payload) => {
+          log('board.deleted', payload);
+        });
+
+        // Eventos de tasks
+        socket.on('task.created', (payload) => {
+          log('task.created', payload);
+        });
+
+        socket.on('task.updated', (payload) => {
+          log('task.updated', payload);
+        });
+
+        socket.on('task.deleted', (payload) => {
+          log('task.deleted', payload);
+        });
+      }
+
+      btnReconnect.addEventListener('click', () => {
+        log(null, '--- Reconnecting manually ---');
+        connect();
+      });
+
+      btnClear.addEventListener('click', () => {
+        logsEl.innerHTML = '';
+      });
+
+      // Conectar al cargar la página
+      connect();
+    </script>
+  </body>
+</html>
