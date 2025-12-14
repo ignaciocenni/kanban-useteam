@@ -1,10 +1,10 @@
-# N8N Workflow Setup: Kanban Backlog Export
+# n8n: Exportación de Backlog (CSV)
 
 ## Requisitos previos
-- N8N v1.0 o superior instalado localmente (`docker run` recomendado en el README).
-- Backend NestJS ejecutándose en `http://localhost:3000`.
-- MongoDB disponible con datos de tareas.
-- Cuenta SMTP configurada para envío de emails.
+- n8n en Docker (`docker run` recomendado en el README)
+- Backend NestJS ejecutándose localmente
+- MongoDB con datos del tablero
+- Cuenta SMTP (se configura manualmente en la UI de n8n; no se versiona)
 
 ## Pasos
 
@@ -24,7 +24,7 @@ docker run -it --rm \
 - Verifica que el nodo `Webhook` tenga la ruta `kanban-export` y método `POST`.
 
 ### 3. Configurar credenciales SMTP
-El workflow incluye un nodo **Send Email** que requiere credenciales SMTP:
+El workflow incluye un nodo **Send Email** que requiere credenciales SMTP (manual):
 1. Haz clic en el nodo **Send Email**.
 2. En **Credentials**, selecciona **Create New** → **SMTP account**.
 3. Completa:
@@ -35,13 +35,14 @@ El workflow incluye un nodo **Send Email** que requiere credenciales SMTP:
    - **Secure**: activado si usas puerto 465
 4. Guarda las credenciales.
 
-### 4. Revisar nodos del workflow
-El workflow incluye:
-- **Webhook**: recibe `POST` con `{ boardId, email, fields? }`.
-- **Fetch Tasks from API**: consulta `GET http://localhost:3000/tasks?boardId=...`.
-- **Convert to CSV**: transforma JSON de tareas en archivo CSV.
-- **Send Email**: adjunta CSV y envía al email indicado en el payload.
-- **Webhook Response**: devuelve `{ success: true }` al backend.
+### 4. Nodos del workflow
+Webhook → HTTP Request al backend → (opcional) Set/Edit Fields → Convert to CSV → Send Email → Webhook Response
+- **Webhook**: recibe `POST` con `{ boardId, email, fields? }`
+- **Fetch Tasks from API**: consulta `GET` al backend
+  - Si n8n corre en Docker, usa `http://host.docker.internal:3000`
+- **Convert to CSV**: transforma JSON de tareas en **CSV** simple (sin formato visual)
+- **Send Email**: adjunta CSV y envía al email indicado
+- **Webhook Response**: devuelve `{ success: true }` al backend
 
 ### 5. Activar el workflow
 - Usa el interruptor **Activate** (arriba a la derecha). El estado debe quedar en "Active".

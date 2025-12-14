@@ -8,42 +8,35 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "1a11c128-621a-4fbc-8e9a-4c246c2ebc74",
+      "id": "3f137820-1691-4788-bad4-bcfee710efd9",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        0,
-        0
-      ],
+      "position": [80, 0],
       "webhookId": "kanban-export"
     },
     {
       "parameters": {
-        "url": "=http://localhost:3000/tasks?boardId={{$json.body.boardId}}",
+        "url": "=http://host.docker.internal:3000/tasks?boardId={{$json[\"boardId\"]}}",
         "options": {}
       },
-      "id": "3e9cb74d-e457-4e2d-90a3-82955f482619",
+      "id": "cff0bed3-1ca6-4d0d-88ec-0f3239bd0995",
       "name": "Fetch Tasks from API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        224,
-        0
-      ]
+      "position": [256, 0]
     },
     {
       "parameters": {
-        "options": {}
+        "options": {
+          "delimiter": ";"
+        }
       },
-      "id": "4a433de4-d68c-4c53-be96-0fd002e513a7",
+      "id": "9e3d3e26-11c3-47e1-ad16-4350167ec0ad",
       "name": "Convert to CSV",
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
-      "position": [
-        448,
-        0
-      ]
+      "position": [608, 0]
     },
     {
       "parameters": {
@@ -54,17 +47,15 @@
           "attachments": "data"
         }
       },
-      "id": "f0ecccf0-5913-4cfb-88c6-b1e2a4d5fd7d",
+      "id": "9b9bf00c-fc80-4acc-8ddc-b824145d1a0a",
       "name": "Send Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [
-        672,
-        0
-      ],
+      "position": [784, 0],
+      "webhookId": "fb7c6c84-9f40-4a5a-8c16-fa3af7acf58c",
       "credentials": {
         "smtp": {
-          "id": "1",
+          "id": "qx6cGpf2w5EUtg2n",
           "name": "SMTP account"
         }
       }
@@ -75,14 +66,55 @@
         "responseBody": "={{ { \"success\": true, \"message\": \"Export email sent successfully\" } }}",
         "options": {}
       },
-      "id": "0f49f9fd-edb2-454b-856a-0c9f6d8db137",
+      "id": "6e942246-d6fe-41ac-81ae-2bd85e3bfde8",
       "name": "Webhook Response",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [
-        896,
-        0
-      ]
+      "position": [960, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a4619384-97b9-43d1-8e38-fdeae9dec216",
+              "name": "ID de tarea",
+              "value": "={{ $json._id || $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "eeb6c1c4-f2cf-4f63-a507-4c6912722c56",
+              "name": "Título",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "27d98011-9d85-418b-a7b7-419c6d7d76b6",
+              "name": "Descripción",
+              "value": "={{ ($json.description || '').replace(/\\r?\\n/g, ' ') }}",
+              "type": "string"
+            },
+            {
+              "id": "5c0db521-4a1a-4605-8cad-382ba396c210",
+              "name": "Columna",
+              "value": "={{   $json.column === '0-to-do'     ? 'TO DO'     : $json.column === '1-in-progress'       ? 'IN PROGRESS'       : $json.column === '2-done'         ? 'DONE'         : $json.column }}",
+              "type": "string"
+            },
+            {
+              "id": "dae67050-19bb-499b-9d35-0c9d98c21936",
+              "name": "Fecha de creación",
+              "value": "={{ new Date($json.createdAt).toISOString().slice(0, 19).replace('T', ' ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [432, 0],
+      "id": "17d2cfb3-7eb7-40bd-94b7-5fe15c811751",
+      "name": "Edit Fields"
     }
   ],
   "pinData": {},
@@ -102,7 +134,7 @@
       "main": [
         [
           {
-            "node": "Convert to CSV",
+            "node": "Edit Fields",
             "type": "main",
             "index": 0
           }
@@ -130,11 +162,28 @@
           }
         ]
       ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Convert to CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
   "settings": {
     "executionOrder": "v1"
   },
+  "versionId": "40ef6484-13aa-486a-ac3b-8043bfd35a06",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "edb7f37de37d76b566fdc9f7b8b4872104a0573f8d1a3d7ec261417a7b948550"
+  },
+  "id": "KJMWBaSr5fX5HxVP",
   "tags": []
 }
