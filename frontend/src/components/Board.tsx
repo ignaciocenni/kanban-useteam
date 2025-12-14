@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import type { BoardContract } from '../contracts/board.contract';
-import type { Task } from '../types';
-import type { Column as ColumnType } from '../types';
-import { Column } from './Column';
-import { TaskForm } from './TaskForm';
-import { Modal } from './Modal';
-import { useKanbanStore } from '../store/useKanbanStore';
+import React, { useState } from "react";
+import type { BoardContract } from "../contracts/board.contract";
+import type { Task } from "../types";
+import type { Column as ColumnType } from "../types";
+import { Column } from "./Column";
+import { TaskForm } from "./TaskForm";
+import { Modal } from "./Modal";
+import { useKanbanStore } from "../store/useKanbanStore";
 
 type BoardWithColumns = BoardContract & { columns?: ColumnType[] };
 
@@ -39,9 +39,9 @@ export const Board: React.FC<BoardProps> = ({
     (state) => state.reorderTaskLocally
   );
 
-  /* =======================
-     Drag handlers
-     ======================= */
+  // =======================
+  //   Drag handlers
+  // =======================
 
   const handleDragStart = (task: Task) => {
     setDraggedTask(task);
@@ -49,9 +49,20 @@ export const Board: React.FC<BoardProps> = ({
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.dataTransfer.dropEffect = "move";
   };
 
+  /**
+   * Calcula `newPosition` al soltar una tarjeta y aplica
+   * reordenamiento optimista seguido de actualización en backend.
+   *
+   * Algoritmo:
+   * - Si el drop es en zona vacía, usa el fondo de la columna.
+   * - En la misma columna, se excluye la tarea arrastrada del cálculo base.
+   * - Si hay `dragOverTaskId`, se toma su índice como posición destino.
+   * - Se clamp-ea `newPosition` a [0, length] y se llama al store para
+   *   actualizar la UI; luego se invoca `onUpdateTaskPosition` al backend.
+   */
   const handleDrop = async (targetColumnId: string) => {
     if (!draggedTask) return;
 
@@ -73,7 +84,9 @@ export const Board: React.FC<BoardProps> = ({
       // Drop en zona vacía → fondo de columna
       newPosition = baseColumnTasks.length;
     } else {
-      const overIndex = baseColumnTasks.findIndex((t) => t.id === dragOverTaskId);
+      const overIndex = baseColumnTasks.findIndex(
+        (t) => t.id === dragOverTaskId
+      );
 
       if (overIndex === -1) {
         newPosition = baseColumnTasks.length;
@@ -96,7 +109,7 @@ export const Board: React.FC<BoardProps> = ({
     try {
       await onUpdateTaskPosition?.(draggedTask.id, targetColumnId, newPosition);
     } catch (error) {
-      console.error('Error updating task position:', error);
+      console.error("Error updating task position:", error);
     }
 
     // Reset estado drag
@@ -104,9 +117,9 @@ export const Board: React.FC<BoardProps> = ({
     setDragOverTaskId(null);
   };
 
-  /* =======================
-     Create task
-     ======================= */
+  // =======================
+  //   Create task
+  // =======================
 
   const handleCreateTask = (columnId: string) => {
     setShowCreateForm(columnId);
@@ -118,7 +131,7 @@ export const Board: React.FC<BoardProps> = ({
     try {
       const newTask = {
         title: taskData.title,
-        description: taskData.description || '',
+        description: taskData.description || "",
         boardId: board.id,
         columnId: showCreateForm,
         position: tasks.filter((t) => t.columnId === showCreateForm).length,
@@ -127,22 +140,22 @@ export const Board: React.FC<BoardProps> = ({
       await onCreateTask?.(newTask);
       setShowCreateForm(null);
     } catch (error) {
-      console.error('Error creating task:', error);
+      console.error("Error creating task:", error);
     }
   };
 
-  /* =======================
-     Helpers
-     ======================= */
+  // =======================
+  //   Helpers
+  // =======================
 
   const getTasksByColumn = (columnId: string): Task[] =>
     tasks
       .filter((task) => task.columnId === columnId)
       .sort((a, b) => a.position - b.position);
 
-  /* =======================
-     Render
-     ======================= */
+  // =======================
+  //   Render
+  // =======================
 
   return (
     <div className="kanban-board">
