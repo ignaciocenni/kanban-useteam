@@ -161,6 +161,21 @@ export class TasksService {
   }
 
   // Drag & drop
+  /**
+   * Reordena una tarea dentro de una columna o entre columnas, garantizando
+   * consistencia de índices (`position`) en la columna destino.
+   *
+   * Estrategia:
+   * - Carga la tarea a mover y obtiene `oldColumn`/`oldPosition`.
+   * - Obtiene las tareas de la columna destino (sin la tarea movida) ordenadas.
+   * - Normaliza `newPosition` para que esté en rango [0, length].
+   * - Calcula las posiciones finales de las tareas destino aplicando hueco en `newPosition`
+   *   (las tareas con índice >= `newPosition` se desplazan +1).
+   * - Ejecuta `bulkWrite` para aplicar el reindexado en la base.
+   * - Actualiza la tarea movida con su nueva `column` y `position`.
+   * - Emite `task.updated` por cada tarea afectada y por la tarea movida,
+   *   permitiendo que los clientes remotos sincronicen el orden local correctamente.
+   */
   async updatePosition(
     clientId: string | undefined,
     id: string,
