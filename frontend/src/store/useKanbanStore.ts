@@ -1,10 +1,13 @@
-import { create } from 'zustand';
-import type { TaskContract } from '../contracts/task.contract';
-import type { BoardContract } from '../contracts/board.contract';
-import { getSocket } from '../services/socket';
-import { getClientId } from '../services/clientId';
-import type { Task } from '../types';
-import { fromTaskContract, fromTaskContractPartial } from '../mappers/task.mapper';
+import { create } from "zustand";
+import type { TaskContract } from "../contracts/task.contract";
+import type { BoardContract } from "../contracts/board.contract";
+import { getSocket } from "../services/socket";
+import { getClientId } from "../services/clientId";
+import type { Task } from "../types";
+import {
+  fromTaskContract,
+  fromTaskContractPartial,
+} from "../mappers/task.mapper";
 
 interface KanbanState {
   boards: BoardContract[];
@@ -54,6 +57,19 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
       tasks: state.tasks.filter((t) => t.id !== taskId),
     })),
 
+  /**
+   * Reordenamiento optimista en memoria.
+   *
+   * Objetivos:
+   * - Actualizar inmediatamente la UI al arrastrar/soltar sin esperar backend.
+   * - Mantener índices (`position`) consecutivos desde 0 en cada columna.
+   *
+   * Detalles:
+   * - `safePosition` se clamp-ea a [0, length] de la columna destino.
+   * - Se inserta la tarea movida en la posición objetivo y se reindexa destino.
+   * - Si cambia de columna, se reindexa la columna origen; otras columnas intactas.
+   * - Complejidad O(n) respecto de la cantidad de tareas en las columnas afectadas.
+   */
   reorderTaskLocally: (taskId, newColumnId, newPosition) => {
     set((state) => {
       const taskToMove = state.tasks.find((t) => t.id === taskId);
@@ -114,25 +130,35 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
     });
   },
 
+  /**
+   * Inicializa suscripción a eventos de tiempo real.
+   *
+   * Puntos clave:
+   * - `clientId` por pestaña: el backend adjunta `clientId` y el frontend
+   *   descarta eventos originados en la misma pestaña para evitar duplicados.
+   * - Se mapean contratos (`TaskContract`) a tipos de dominio (`Task`) con mappers.
+   * - Se emiten toasts a través de `window.dispatchEvent('kanban:toast', ...)`
+   *   para centralizar UI de notificaciones.
+   */
   initSocket: () => {
     const socket = getSocket();
     const clientId = getClientId();
 
-    socket.off('task.created');
-    socket.off('task.updated');
-    socket.off('task.deleted');
+    socket.off("task.created");
+    socket.off("task.updated");
+    socket.off("task.deleted");
 
     socket.on(
-      'task.created',
+      "task.created",
       (payload: TaskContract & { clientId?: string }) => {
         if (payload.clientId === clientId) return;
         get().applyTaskCreated(fromTaskContract(payload));
         try {
           window.dispatchEvent(
-            new CustomEvent('kanban:toast', {
+            new CustomEvent("kanban:toast", {
               detail: {
-                type: 'info',
-                title: 'Se creó una nueva tarea',
+                type: "info",
+                title: "Se creó una nueva tarea",
               },
             })
           );
@@ -141,7 +167,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
     );
 
     socket.on(
-      'task.updated',
+      "task.updated",
       (payload: Partial<TaskContract> & { id: string; clientId?: string }) => {
         if (payload.clientId === clientId) return;
 
@@ -157,16 +183,16 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
           const isMove =
             patch.columnId !== undefined && nextColumnId !== prevColumnId;
           const isEdit =
-            Object.prototype.hasOwnProperty.call(payload, 'title') ||
-            Object.prototype.hasOwnProperty.call(payload, 'description');
+            Object.prototype.hasOwnProperty.call(payload, "title") ||
+            Object.prototype.hasOwnProperty.call(payload, "description");
           window.dispatchEvent(
-            new CustomEvent('kanban:toast', {
+            new CustomEvent("kanban:toast", {
               detail: {
-                type: 'info',
+                type: "info",
                 title: isMove
-                  ? 'Una tarea cambió de columna'
+                  ? "Una tarea cambió de columna"
                   : isEdit
-                  ? 'Una tarea fue actualizada'
+                  ? "Una tarea fue actualizada"
                   : undefined,
               },
             })
@@ -175,13 +201,13 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
       }
     );
 
-    socket.on('task.deleted', (payload: { id: string; clientId?: string }) => {
+    socket.on("task.deleted", (payload: { id: string; clientId?: string }) => {
       if (payload.clientId === clientId) return;
       get().applyTaskDeleted(payload.id);
       try {
         window.dispatchEvent(
-          new CustomEvent('kanban:toast', {
-            detail: { type: 'warning', title: 'Una tarea fue eliminada' },
+          new CustomEvent("kanban:toast", {
+            detail: { type: "warning", title: "Una tarea fue eliminada" },
           })
         );
       } catch {}
