@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ExportBacklogDto } from './dto/export-backlog.dto';
 
@@ -38,11 +42,15 @@ export class ExportsService {
 
       if (!response.ok) {
         const text = await response.text();
-        this.logger.error(`Export webhook failed: ${response.status} - ${text}`);
-        throw new InternalServerErrorException('Failed to trigger export workflow');
+        this.logger.error(
+          `Export webhook failed: ${response.status} - ${text}`,
+        );
+        throw new InternalServerErrorException(
+          'Failed to trigger export workflow',
+        );
       }
 
-      const data = await response.json().catch(() => undefined);
+      const data: unknown = await response.json().catch(() => undefined);
 
       return {
         success: true,
@@ -50,8 +58,13 @@ export class ExportsService {
         data,
       };
     } catch (error) {
-      this.logger.error('Error triggering export workflow', error instanceof Error ? error.stack : error);
-      throw new InternalServerErrorException('Failed to trigger export workflow');
+      this.logger.error(
+        'Error triggering export workflow',
+        error instanceof Error ? error.stack : error,
+      );
+      throw new InternalServerErrorException(
+        'Failed to trigger export workflow',
+      );
     }
   }
 }

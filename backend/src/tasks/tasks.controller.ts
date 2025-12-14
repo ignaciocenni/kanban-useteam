@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Query,
+  Headers,
 } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -18,47 +19,62 @@ export class TasksController {
 
   // POST /tasks - Crear tarea
   @Post()
-  create(@Body() createTaskDto: CreateTaskDto) {
-    return this.tasksService.create(createTaskDto);
+  create(
+    @Headers('x-client-id') clientId: string | undefined,
+    @Body() createTaskDto: CreateTaskDto,
+  ) {
+    return this.tasksService.create(clientId, createTaskDto);
   }
 
-  // GET /tasks?boardId=xxx - Listar tareas (opcionalmente filtrar por boardId)
+  // GET /tasks?boardId=...
   @Get()
   findAll(@Query('boardId') boardId?: string) {
     return this.tasksService.findAll(boardId);
   }
 
-  // GET /tasks/board/:boardId - Obtener todas las tareas de un board específico
+  // GET /tasks/board/:boardId
   @Get('board/:boardId')
   findByBoard(@Param('boardId') boardId: string) {
     return this.tasksService.findByBoard(boardId);
   }
 
-  // GET /tasks/:id - Obtener una tarea por ID
+  // GET /tasks/:id
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.tasksService.findOne(id); // ✅ Sin el +
+    return this.tasksService.findOne(id);
   }
 
-  // PATCH /tasks/:id - Actualizar tarea
+  // PATCH /tasks/:id
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
-    return this.tasksService.update(id, updateTaskDto); // ✅ Sin el +
+  update(
+    @Headers('x-client-id') clientId: string | undefined,
+    @Param('id') id: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+  ) {
+    return this.tasksService.update(clientId, id, updateTaskDto);
   }
 
-  // DELETE /tasks/:id - Eliminar tarea
+  // DELETE /tasks/:id
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.tasksService.remove(id); // ✅ Sin el +
+  remove(
+    @Headers('x-client-id') clientId: string | undefined,
+    @Param('id') id: string,
+  ) {
+    return this.tasksService.remove(clientId, id);
   }
 
-  // PATCH /tasks/:id/position - Actualizar posición (drag & drop)
+  // PATCH /tasks/:id/position
   @Patch(':id/position')
   updatePosition(
+    @Headers('x-client-id') clientId: string | undefined,
     @Param('id') id: string,
-    @Body('column') column: string,
-    @Body('position') position: number,
+    @Body() body: { column: string; position: number },
   ) {
-    return this.tasksService.updatePosition(id, column, position);
+    return this.tasksService.updatePosition(
+      clientId,
+      id,
+      body.column,
+      body.position,
+    );
   }
 }

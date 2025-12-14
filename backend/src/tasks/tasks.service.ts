@@ -1,30 +1,43 @@
 import {
   Injectable,
   NotFoundException,
-  BadRequestException,
+  Inject,
+  forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { Task, TaskDocument } from './entities/task.entity';
 import { BoardsService } from '../boards/boards.service';
 import { EventsGateway } from '../events/events.gateway';
+import { TasksMapper } from './tasks.mapper';
+import { TaskResponseDto } from './dto/task-response.dto';
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
-    @InjectModel(Task.name) private taskModel: Model<TaskDocument>,
+    @InjectModel(Task.name)
+    private taskModel: Model<TaskDocument>,
+
+    // FIX: resolver dependencia circular con BoardsService
+    @Inject(forwardRef(() => BoardsService))
     private boardsService: BoardsService,
+
     private eventsGateway: EventsGateway,
   ) {}
 
   // Crear una nueva tarea
-  async create(createTaskDto: CreateTaskDto): Promise<Task> {
+  async create(
+    clientId: string | undefined,
+    createTaskDto: CreateTaskDto,
+  ): Promise<TaskResponseDto> {
     // Validar que el board existe
     await this.boardsService.findOne(createTaskDto.boardId);
 
-    // Si no se proporciona posición, calcular la última posición + 1
     if (createTaskDto.position === undefined) {
       const lastTask = await this.taskModel
         .findOne({
@@ -39,39 +52,52 @@ export class TasksService {
 
     const createdTask = new this.taskModel(createTaskDto);
     const saved = await createdTask.save();
-    // Emitir evento en tiempo real
-    this.eventsGateway.emitTaskCreated(this.normalizeTask(saved));
-    return saved;
+    const response = TasksMapper.toResponse(saved);
+
+    // Emitir evento SOLO a otros
+    this.eventsGateway.emitTaskCreated(clientId, response);
+
+    return response;
   }
 
   // Obtener todas las tareas (opcionalmente filtrar por boardId)
-  async findAll(boardId?: string): Promise<Task[]> {
+  async findAll(boardId?: string): Promise<TaskResponseDto[]> {
     const filter = boardId ? { boardId } : {};
-    return this.taskModel.find(filter).sort({ column: 1, position: 1 }).exec();
+    const tasks = await this.taskModel
+      .find(filter)
+      .sort({ column: 1, position: 1 })
+      .exec();
+    return TasksMapper.toResponseList(tasks);
   }
 
-  // Obtener tareas de un board específico agrupadas por columna
-  async findByBoard(boardId: string): Promise<Task[]> {
-    // Validar que el board existe
+  // Obtener tareas de un board específico
+  async findByBoard(boardId: string): Promise<TaskResponseDto[]> {
     await this.boardsService.findOne(boardId);
 
-    return this.taskModel.find({ boardId }).sort({ position: 1 }).exec();
+    const tasks = await this.taskModel
+      .find({ boardId })
+      .sort({ position: 1 })
+      .exec();
+    return TasksMapper.toResponseList(tasks);
   }
 
   // Obtener una tarea por ID
-  async findOne(id: string): Promise<Task> {
+  async findOne(id: string): Promise<TaskResponseDto> {
     const task = await this.taskModel.findById(id).exec();
 
     if (!task) {
       throw new NotFoundException(`Task con ID ${id} no encontrada`);
     }
 
-    return task;
+    return TasksMapper.toResponse(task);
   }
 
   // Actualizar una tarea
-  async update(id: string, updateTaskDto: UpdateTaskDto): Promise<Task> {
-    // Si se cambia el boardId, validar que el nuevo board existe
+  async update(
+    clientId: string | undefined,
+    id: string,
+    updateTaskDto: UpdateTaskDto,
+  ): Promise<TaskResponseDto> {
     if (updateTaskDto.boardId) {
       await this.boardsService.findOne(updateTaskDto.boardId);
     }
@@ -84,46 +110,65 @@ export class TasksService {
       throw new NotFoundException(`Task con ID ${id} no encontrada`);
     }
 
-    // Emitir evento en tiempo real
-    this.eventsGateway.emitTaskUpdated(this.normalizeTask(updatedTask));
-    return updatedTask;
+    const response = TasksMapper.toResponse(updatedTask);
+
+    this.eventsGateway.emitTaskUpdated(clientId, response);
+
+    return response;
   }
 
   // Eliminar una tarea
-  async remove(id: string): Promise<Task> {
+  async remove(
+    clientId: string | undefined,
+    id: string,
+  ): Promise<TaskResponseDto> {
     const deletedTask = await this.taskModel.findByIdAndDelete(id).exec();
 
     if (!deletedTask) {
       throw new NotFoundException(`Task con ID ${id} no encontrada`);
     }
 
-    // Emitir evento en tiempo real
-    this.eventsGateway.emitTaskDeleted({
-      id: this.ensureStringId(deletedTask.id ?? (deletedTask as any)._id),
-      boardId: this.ensureStringId(
-        (deletedTask as any).boardId ?? (deletedTask as any).board?.id,
-      ),
+    const response = TasksMapper.toResponse(deletedTask);
+    this.eventsGateway.emitTaskDeleted(clientId, {
+      id: response.id,
+      boardId: response.boardId,
     });
-    return deletedTask;
+
+    return response;
   }
 
   /**
-   * Actualizar posición de una tarea (drag & drop)
-   * 
-   * Algoritmo:
-   * 1. Obtiene todas las tareas de la columna destino (excluyendo la que se mueve)
-   * 2. Inserta la tarea en la nueva posición
-   * 3. Recalcula las posiciones de todas las tareas afectadas
-   * 4. Actualiza en batch para optimizar operaciones de BD
-   * 5. Emite eventos WebSocket para sincronización en tiempo real
+   * Elimina todas las tareas asociadas a un board específico
    */
+  async deleteByBoardId(
+    clientId: string | undefined,
+    boardId: string,
+  ): Promise<number> {
+    const tasks = await this.taskModel.find({ boardId }).exec();
+
+    if (!tasks.length) return 0;
+
+    // Emitir eventos por cada tarea eliminada
+    for (const t of tasks) {
+      this.eventsGateway.emitTaskDeleted(clientId, {
+        id: this.ensureStringId(t._id),
+        boardId: this.ensureStringId(boardId),
+      });
+    }
+
+    const result = await this.taskModel.deleteMany({ boardId }).exec();
+    return result.deletedCount ?? 0;
+  }
+
+  // Drag & drop
   async updatePosition(
+    clientId: string | undefined,
     id: string,
     newColumn: string,
     newPosition: number,
-  ): Promise<Task> {
+  ): Promise<TaskResponseDto> {
     const taskToMove = await this.taskModel.findById(id).exec();
-    
+
     if (!taskToMove) {
       throw new NotFoundException(`Task con ID ${id} no encontrada`);
     }
@@ -131,53 +176,58 @@ export class TasksService {
     const oldColumn = taskToMove.column;
     const oldPosition = taskToMove.position;
 
+    this.logger.log({
+      msg: 'task:move:start',
+      taskId: id,
+      fromColumnId: oldColumn,
+      toColumnId: newColumn,
+      oldPosition,
+      newPosition,
+    });
+
     if (oldColumn === newColumn && oldPosition === newPosition) {
-      return taskToMove;
+      return TasksMapper.toResponse(taskToMove);
     }
 
-    // Obtener todas las tareas de la columna de destino (excluyendo la que se mueve)
     const tasksInTargetColumn = await this.taskModel
-      .find({ 
-        boardId: taskToMove.boardId, 
+      .find({
+        boardId: taskToMove.boardId,
         column: newColumn,
-        _id: { $ne: id }
+        _id: { $ne: id },
       })
       .sort({ position: 1 })
       .exec();
 
-    // Validar que newPosition esté en rango
-    if (newPosition < 0) {
-      newPosition = 0;
-    }
+    if (newPosition < 0) newPosition = 0;
     if (newPosition > tasksInTargetColumn.length) {
       newPosition = tasksInTargetColumn.length;
     }
 
     const updates: Array<{ id: string; position: number }> = [];
-    
-    // Recalcular posiciones: las tareas después de newPosition se desplazan +1
+
     for (let i = 0; i < tasksInTargetColumn.length; i++) {
       const task = tasksInTargetColumn[i];
       const finalPosition = i < newPosition ? i : i + 1;
-      
+
       if (task.position !== finalPosition) {
-        updates.push({ id: (task as any)._id.toString(), position: finalPosition });
+        updates.push({
+          id: this.ensureStringId(task._id),
+          position: finalPosition,
+        });
       }
     }
 
-    // Actualizar todas las posiciones en batch para optimizar
-    const bulkOps = updates.map(update => ({
+    const bulkOps = updates.map((update) => ({
       updateOne: {
         filter: { _id: update.id },
-        update: { $set: { position: update.position } }
-      }
+        update: { $set: { position: update.position } },
+      },
     }));
 
     if (bulkOps.length > 0) {
       await this.taskModel.bulkWrite(bulkOps);
     }
 
-    // Actualizar la tarea movida
     const updatedTask = await this.taskModel
       .findByIdAndUpdate(
         id,
@@ -186,66 +236,43 @@ export class TasksService {
       )
       .exec();
 
-    // Emitir eventos WebSocket para sincronización en tiempo real
     for (const update of updates) {
       const task = await this.taskModel.findById(update.id).exec();
       if (task) {
-        this.eventsGateway.emitTaskUpdated(this.normalizeTask(task));
+        this.eventsGateway.emitTaskUpdated(
+          clientId,
+          TasksMapper.toResponse(task),
+        );
       }
     }
 
-    this.eventsGateway.emitTaskUpdated(this.normalizeTask(updatedTask!));
-    
-    return updatedTask!;
+    const response = TasksMapper.toResponse(updatedTask!);
+    this.eventsGateway.emitTaskUpdated(clientId, response);
+
+    this.logger.log({
+      msg: 'task:move:done',
+      taskId: id,
+      fromColumnId: oldColumn,
+      toColumnId: newColumn,
+      oldPosition,
+      newPosition: response.position,
+    });
+
+    return response;
   }
 
-  /**
-   * Normaliza un valor a string para garantizar compatibilidad con frontend
-   */
+  // --- Helpers ---
   private ensureStringId(value: unknown): string {
-    if (!value) return '';
     if (typeof value === 'string') return value;
-    if (typeof (value as any).toString === 'function') {
-      return (value as any).toString();
+    if (value instanceof Types.ObjectId) return value.toHexString();
+    if (
+      value &&
+      typeof value === 'object' &&
+      'toString' in value &&
+      typeof (value as { toString: () => string }).toString === 'function'
+    ) {
+      return (value as { toString: () => string }).toString();
     }
-    return String(value);
-  }
-
-  /**
-   * Convierte fechas a formato ISO string
-   */
-  private toIsoString(value: unknown): string {
-    if (!value) return new Date().toISOString();
-    const date = value instanceof Date ? value : new Date(value as string);
-    return Number.isNaN(date.getTime())
-      ? new Date().toISOString()
-      : date.toISOString();
-  }
-
-  /**
-   * Normaliza documento de Mongoose a formato esperado por frontend
-   * Convierte _id a id, elimina campos internos de Mongo (__v)
-   */
-  private normalizeTask(task: Task | TaskDocument) {
-    const doc = task as any;
-    const plain =
-      typeof doc.toObject === 'function' ? doc.toObject() : { ...task };
-
-    const {
-      _id,
-      __v,
-      boardId: rawBoardId,
-      createdAt,
-      updatedAt,
-      ...rest
-    } = plain;
-
-    return {
-      ...rest,
-      id: this.ensureStringId(_id ?? plain.id),
-      boardId: this.ensureStringId(rawBoardId),
-      createdAt: this.toIsoString(createdAt),
-      updatedAt: this.toIsoString(updatedAt),
-    };
+    return '';
   }
 }

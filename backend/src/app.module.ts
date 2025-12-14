@@ -19,7 +19,7 @@ import { ExportsModule } from './exports/exports.module';
     // MongooseModule: Conexión a MongoDB con ConfigService
     MongooseModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         uri:
           configService.get<string>('MONGODB_URI') ||
           'mongodb://localhost:27018/kanban-useteam',

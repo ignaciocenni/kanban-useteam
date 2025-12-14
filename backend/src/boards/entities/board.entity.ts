@@ -12,8 +12,20 @@ export class Board {
   @Prop({ default: '' })
   description: string;
 
-  @Prop({ type: [String], default: ['To Do', 'In Progress', 'Done'] })
-  columns: string[]; // Array de nombres de columnas
+  @Prop({
+    type: [
+      {
+        id: { type: String, required: true },
+        title: { type: String, required: true },
+      },
+    ],
+    default: [
+      { id: '0-to-do', title: 'To Do' },
+      { id: '1-in-progress', title: 'In Progress' },
+      { id: '2-done', title: 'Done' },
+    ],
+  })
+  columns: { id: string; title: string }[];
 
   // createdAt y updatedAt se agregan automáticamente por { timestamps: true }
 }
