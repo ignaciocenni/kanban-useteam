@@ -30,7 +30,14 @@ export class EventsGateway {
   public server: Server;
 
   /**
-   * Adjunta el clientId al payload si viene definido
+   * Adjunta el `clientId` al payload si viene definido.
+   *
+   * Contexto:
+   * - El servidor emite eventos a todos los clientes (incluyendo al origen).
+   * - Para evitar duplicaciones de UI y toasts en el cliente que originó el cambio,
+   *   el frontend compara el `clientId` del payload con su ID de pestaña y descarta
+   *   eventos propios.
+   * - Este método centraliza el agregado opcional de `clientId` para todos los eventos.
    */
   private withClientId<T extends object>(
     clientId: string | undefined,
@@ -40,7 +47,12 @@ export class EventsGateway {
   }
 
   /**
-   * Eventos de tareas
+   * Emite creación de tarea a todos los clientes, incluyendo el que la generó.
+   *
+   * Detalle:
+   * - Se usa `server.emit` (broadcast global).
+   * - El `clientId` viaja en el payload para que el frontend ignore el evento
+   *   si proviene de la misma pestaña que hizo la acción.
    */
   emitTaskCreated(
     clientId: string | undefined,
@@ -49,6 +61,10 @@ export class EventsGateway {
     this.server?.emit('task.created', this.withClientId(clientId, payload));
   }
 
+  /**
+   * Emite actualización de tarea (edición o movimiento) con `clientId` adjunto.
+   * El frontend diferencia ediciones vs movimientos y filtra eventos propios.
+   */
   emitTaskUpdated(
     clientId: string | undefined,
     payload: TaskResponseDto,
@@ -56,6 +72,10 @@ export class EventsGateway {
     this.server?.emit('task.updated', this.withClientId(clientId, payload));
   }
 
+  /**
+   * Emite eliminación de tarea. El `clientId` permite evitar toasts duplicados
+   * en la pestaña que realizó la eliminación.
+   */
   emitTaskDeleted(
     clientId: string | undefined,
     payload: TaskDeletedPayload,
@@ -64,7 +84,8 @@ export class EventsGateway {
   }
 
   /**
-   * Eventos de tableros
+   * Emite cambios en tableros (creado/actualizado/eliminado).
+   * El `clientId` es opcional: algunos cambios pueden originarse en backend.
    */
   emitBoardUpdated(
     clientId: string | undefined,
