@@ -47,6 +47,11 @@ export const Board: React.FC<BoardProps> = ({
     setDraggedTask(task);
   };
 
+  /**
+   * Maneja evento `dragover` sobre tarjeta o columna.
+   * - Previene comportamiento por defecto para permitir drop.
+   * - Establece efecto drop como "move" para indicar movimiento válido.
+   */
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -106,6 +111,10 @@ export const Board: React.FC<BoardProps> = ({
     // =========================
     // BACKEND
     // =========================
+    /**
+     * Actualiza posición en backend y maneja posibles errores.
+     * - Si ocurre un error, se restaura el reorder optimista.
+     */
     try {
       await onUpdateTaskPosition?.(draggedTask.id, targetColumnId, newPosition);
     } catch (error) {
