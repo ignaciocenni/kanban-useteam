@@ -162,10 +162,20 @@ function App() {
         columns && Array.isArray(columns)
           ? columns.find((c) => c.id === columnId)?.title
           : undefined;
-      showToast(
-        'info',
-        columnTitle ? `Tarea movida a «${columnTitle}»` : 'Tarea movida'
-      );
+      /**
+       * Criterio de toasts locales post-movimiento:
+       * - Si el último movimiento fue intra-columna (prev === next), NO emitir toast.
+       * - Si fue entre columnas (prev !== next), emitir "Tarea movida a <columna destino>".
+       */
+      const meta = useKanbanStore.getState().lastMoveMeta;
+      const isSameColumn =
+        meta && meta.taskId === id && meta.prevColumnId === meta.nextColumnId;
+      if (!isSameColumn) {
+        showToast(
+          'info',
+          columnTitle ? `Tarea movida a «${columnTitle}»` : 'Tarea movida'
+        );
+      }
     } catch {}
   };
 
