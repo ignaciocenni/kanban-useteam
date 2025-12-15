@@ -31,6 +31,14 @@ interface KanbanState {
   initSocket: () => void;
 }
 
+/**
+ * Store Zustand para gestión de estado Kanban.
+ *
+ * Características:
+ * - Persiste estado en localStorage para persistencia entre sesiones.
+ * - Proporciona métodos para manipulación y sincronización con backend.
+ * - Implementa reordenamiento optimista para mejorar experiencia de usuario.
+ */
 export const useKanbanStore = create<KanbanState>((set, get) => ({
   boards: [],
   tasks: [],
@@ -75,6 +83,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
       const taskToMove = state.tasks.find((t) => t.id === taskId);
       if (!taskToMove) return state;
 
+      // 0. Extraer columna origen
       const sourceColumnId = taskToMove.columnId;
 
       // 1. Separar tareas
@@ -98,6 +107,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
         position: safePosition,
       };
 
+      // 5. Reindexar columna destino
       const reorderedTargetColumn = [
         ...targetColumnTasks.slice(0, safePosition),
         updatedMovedTask,
@@ -107,7 +117,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
         position: index,
       }));
 
-      // 5. Si cambia de columna, reindexar la columna origen
+      // 6. Si cambia de columna, reindexar la columna origen
       const sourceColumnTasks =
         sourceColumnId === newColumnId
           ? []
@@ -119,7 +129,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
                 position: index,
               }));
 
-      // 6. Otras columnas intactas
+      // 7. Otras columnas intactas
       const otherTasks = remainingTasks.filter(
         (t) => t.columnId !== newColumnId && t.columnId !== sourceColumnId
       );
@@ -141,13 +151,16 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
    *   para centralizar UI de notificaciones.
    */
   initSocket: () => {
+    // 1. Obtener socket y clientId
     const socket = getSocket();
     const clientId = getClientId();
 
+    // 2. Desuscribir eventos existentes
     socket.off("task.created");
     socket.off("task.updated");
     socket.off("task.deleted");
 
+    // 3. Suscribir eventos de tareas
     socket.on(
       "task.created",
       (payload: TaskContract & { clientId?: string }) => {
@@ -166,6 +179,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
       }
     );
 
+    // 4. Suscribir evento de actualización
     socket.on(
       "task.updated",
       (payload: Partial<TaskContract> & { id: string; clientId?: string }) => {
@@ -201,6 +215,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
       }
     );
 
+    // 5. Suscribir evento de eliminación
     socket.on("task.deleted", (payload: { id: string; clientId?: string }) => {
       if (payload.clientId === clientId) return;
       get().applyTaskDeleted(payload.id);
