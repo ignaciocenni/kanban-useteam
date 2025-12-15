@@ -13,6 +13,7 @@ interface KanbanState {
   boards: BoardContract[];
   tasks: Task[];
   activeBoardId: string | null;
+  lastMoveMeta?: { taskId: string; prevColumnId: string; nextColumnId: string };
 
   setBoards: (boards: BoardContract[]) => void;
   setTasks: (tasks: Task[]) => void;
@@ -43,6 +44,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
   boards: [],
   tasks: [],
   activeBoardId: null,
+  lastMoveMeta: undefined,
 
   setBoards: (boards) => set({ boards }),
   setTasks: (tasks) => set({ tasks }),
@@ -136,6 +138,17 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
 
       return {
         tasks: [...otherTasks, ...sourceColumnTasks, ...reorderedTargetColumn],
+        /**
+         * Meta del último movimiento para que App distinga
+         * intención del usuario al emitir toasts locales:
+         * - prevColumnId === nextColumnId → reordenamiento intra-columna (sin toast local)
+         * - prevColumnId !== nextColumnId → movimiento entre columnas (toast local)
+         */
+        lastMoveMeta: {
+          taskId,
+          prevColumnId: sourceColumnId,
+          nextColumnId: newColumnId,
+        },
       };
     });
   },
@@ -191,14 +204,36 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
         const patch = fromTaskContractPartial(payload);
         get().applyTaskUpdated({ ...existing, ...patch } as Task);
         try {
+          /**
+           * Criterio de toasts:
+           * - Movimiento real de columna: `columnId` cambia → toast de "cambió de columna".
+           * - Edición de contenido: `title`/`description` cambian → toast de "actualizada".
+           * - Reordenamiento intra-columna (incluye reindexado): solo cambia `position` y no cambia `columnId` → sin toast.
+           *   Se ignoran toasts para evitar duplicados por múltiples `task.updated` derivados de reindexado.
+           */
           const prevColumnId = existing.columnId;
           const nextColumnId =
             patch.columnId !== undefined ? patch.columnId : prevColumnId;
           const isMove =
             patch.columnId !== undefined && nextColumnId !== prevColumnId;
           const isEdit =
-            Object.prototype.hasOwnProperty.call(payload, "title") ||
-            Object.prototype.hasOwnProperty.call(payload, "description");
+            (patch.title !== undefined && patch.title !== existing.title) ||
+            (patch.description !== undefined &&
+              patch.description !== existing.description);
+          const isSameColumnReorder =
+            !isMove &&
+            !isEdit &&
+            patch.position !== undefined &&
+            nextColumnId === prevColumnId;
+
+          if (isSameColumnReorder) {
+            return;
+          }
+          /**
+           * Edición remota:
+           * Emitir toast SIEMPRE cuando `title` y/o `description` cambian respecto del estado previo,
+           * incluso si el backend incluye `position` en el payload (no confundir con reordenamiento).
+           */
           window.dispatchEvent(
             new CustomEvent("kanban:toast", {
               detail: {
