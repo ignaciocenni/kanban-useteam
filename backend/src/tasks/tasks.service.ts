@@ -200,10 +200,12 @@ export class TasksService {
       newPosition,
     });
 
+    // Si la tarea se mueve a la misma posición, no es necesario actualizar
     if (oldColumn === newColumn && oldPosition === newPosition) {
       return TasksMapper.toResponse(taskToMove);
     }
 
+    // Obtener tareas en la columna destino (sin la tarea movida)
     const tasksInTargetColumn = await this.taskModel
       .find({
         boardId: taskToMove.boardId,
@@ -213,6 +215,7 @@ export class TasksService {
       .sort({ position: 1 })
       .exec();
 
+    // Normalizar newPosition para estar en rango [0, length]
     if (newPosition < 0) newPosition = 0;
     if (newPosition > tasksInTargetColumn.length) {
       newPosition = tasksInTargetColumn.length;
@@ -220,10 +223,12 @@ export class TasksService {
 
     const updates: Array<{ id: string; position: number }> = [];
 
+    // Calcular posiciones finales considerando hueco en newPosition
     for (let i = 0; i < tasksInTargetColumn.length; i++) {
       const task = tasksInTargetColumn[i];
       const finalPosition = i < newPosition ? i : i + 1;
 
+      // Actualizar posición si ha cambiado
       if (task.position !== finalPosition) {
         updates.push({
           id: this.ensureStringId(task._id),
@@ -232,6 +237,7 @@ export class TasksService {
       }
     }
 
+    // Aplicar actualizaciones en lote
     const bulkOps = updates.map((update) => ({
       updateOne: {
         filter: { _id: update.id },
@@ -243,6 +249,7 @@ export class TasksService {
       await this.taskModel.bulkWrite(bulkOps);
     }
 
+    // Actualizar tarea movida con nueva columna y posición
     const updatedTask = await this.taskModel
       .findByIdAndUpdate(
         id,
@@ -261,6 +268,7 @@ export class TasksService {
       }
     }
 
+    // Emitir evento para tarea movida
     const response = TasksMapper.toResponse(updatedTask!);
     this.eventsGateway.emitTaskUpdated(clientId, response);
 
@@ -277,6 +285,10 @@ export class TasksService {
   }
 
   // --- Helpers ---
+  /**
+   * Convierte un valor posiblemente ObjectId en cadena hexadecimal.
+   * Utilizado para asegurar consistencia en IDs en operaciones de base de datos.
+   */
   private ensureStringId(value: unknown): string {
     if (typeof value === 'string') return value;
     if (value instanceof Types.ObjectId) return value.toHexString();
