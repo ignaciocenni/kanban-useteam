@@ -23,14 +23,16 @@ export class TasksService {
     @InjectModel(Task.name)
     private taskModel: Model<TaskDocument>,
 
-    // FIX: resolver dependencia circular con BoardsService
+    // Inyectar BoardsService para validar boardId
     @Inject(forwardRef(() => BoardsService))
     private boardsService: BoardsService,
 
     private eventsGateway: EventsGateway,
   ) {}
 
-  // Crear una nueva tarea
+  /**
+   * Crea una nueva tarea.
+   */
   async create(
     clientId: string | undefined,
     createTaskDto: CreateTaskDto,
@@ -60,7 +62,9 @@ export class TasksService {
     return response;
   }
 
-  // Obtener todas las tareas (opcionalmente filtrar por boardId)
+  /**
+   * Obtiene todas las tareas disponibles, opcionalmente filtradas por boardId.
+   */
   async findAll(boardId?: string): Promise<TaskResponseDto[]> {
     const filter = boardId ? { boardId } : {};
     const tasks = await this.taskModel
@@ -70,7 +74,9 @@ export class TasksService {
     return TasksMapper.toResponseList(tasks);
   }
 
-  // Obtener tareas de un board específico
+  /**
+   * Obtiene todas las tareas asociadas a un board específico.
+   */
   async findByBoard(boardId: string): Promise<TaskResponseDto[]> {
     await this.boardsService.findOne(boardId);
 
@@ -81,7 +87,9 @@ export class TasksService {
     return TasksMapper.toResponseList(tasks);
   }
 
-  // Obtener una tarea por ID
+  /**
+   * Obtiene una tarea por su ID.
+   */
   async findOne(id: string): Promise<TaskResponseDto> {
     const task = await this.taskModel.findById(id).exec();
 
@@ -92,7 +100,9 @@ export class TasksService {
     return TasksMapper.toResponse(task);
   }
 
-  // Actualizar una tarea
+  /**
+   * Actualiza una tarea existente.
+   */
   async update(
     clientId: string | undefined,
     id: string,
@@ -117,7 +127,9 @@ export class TasksService {
     return response;
   }
 
-  // Eliminar una tarea
+  /**
+   * Elimina una tarea existente.
+   */
   async remove(
     clientId: string | undefined,
     id: string,
