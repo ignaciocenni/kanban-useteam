@@ -20,6 +20,7 @@ export class TasksService {
   private readonly logger = new Logger(TasksService.name);
 
   constructor(
+    // Inyectar TaskModel para interactuar con la colección de tareas
     @InjectModel(Task.name)
     private taskModel: Model<TaskDocument>,
 
