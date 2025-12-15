@@ -17,7 +17,7 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
-  // POST /tasks - Crear tarea
+  // POST /tasks
   @Post()
   create(
     @Headers('x-client-id') clientId: string | undefined,
